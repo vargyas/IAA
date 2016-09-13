@@ -137,12 +137,12 @@ class MPlot
         TPad * fPad;              
         TPad * fPadRatio;
 
-		MPlot()
-		{
-			Reset();
-			fSplitRatio=0.4;
-			Initialize(0,"","",false);
-		}
+        MPlot()
+        {
+            Reset();
+            fSplitRatio=0.4;
+            Initialize(0,"","",false);
+        }
 
         MPlot(int index, TString xlab, TString ylab, bool sp, float splitratio=0.4){
             Reset();
@@ -579,7 +579,7 @@ class MPlot
 //            fLowerSplitPad = NULL;
         }
 
-		//ClassDef(MPlot,1)
+        //ClassDef(MPlot,1)
 };
 
 #endif /* MPLOT_H */
