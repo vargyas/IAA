@@ -17,7 +17,7 @@
  */
 
 // numbering convention is that [fit flow] = [fit const +1 ]
-enum FitFuncType {kOneGenGaussConst, kOneGenGaussFlow, kKaplanConst, kKaplanFlow, kCauchyConst, kCauchyFlow, kQGaussConst, kQGaussFlow};
+enum FitFuncType {kOneGenGaussConst, kOneGenGaussFlow, kKaplanConst, kKaplanFlow, kCauchyConst, kCauchyFlow, kQGaussConst, kQGaussFlow, kTwoGenGaussConst};
 enum HistType {kDEta, kDPhi};
 
 
@@ -181,8 +181,7 @@ double OneGenGaussFlow(double *x, double *par){
 
 double TwoGenGaussConst(double *x, double *par) {
     //Fit 2 generalized Gaussian + constant
-    //used for DPhi at the moment
-    double dphi   = x[0];
+	double deta   = x[0];
     double bg     = par[0];
     double yield1 = par[1];
     double alpha1 = par[2];
@@ -191,13 +190,13 @@ double TwoGenGaussConst(double *x, double *par) {
     double alpha2 = par[5];
     double beta2  = par[6];
 
-    double arg_near = pow(fabs((dphi-0.)/alpha1), beta1);
-    double arg_far  = pow(fabs((dphi-1.)/alpha2), beta2);
+	double arg1 = pow(fabs(deta/alpha1), beta1);
+	double arg2 = pow(fabs(deta/alpha2), beta2);
 
-    double peak_near = yield1*beta1/2./alpha1/TMath::Gamma(1./beta1) * exp( -1.*arg_near );
-    double peak_far  = yield2*beta2/2./alpha2/TMath::Gamma(1./beta2) * exp( -1.*arg_far );
+	double peak1 = yield1*beta1/2./alpha1/TMath::Gamma(1./beta1) * exp( -1.*arg1 );
+	double peak2 = yield2*beta2/2./alpha2/TMath::Gamma(1./beta2) * exp( -1.*arg2 );
 
-    return bg + peak_near + peak_far;
+	return bg + peak1 + peak2;
 }
 
 double TwoGenGaussFlow(double *x, double *par) {
@@ -351,11 +350,11 @@ private:
 	double deta, dphi;
 	double v2;
 	double fInt_min, fInt_max;
+	TString myName;
 
 public:
 
 	TF1 * ffit;
-	TString myName;
 	double fitmin, fitmax;
 
 	/*
@@ -415,6 +414,7 @@ public:
 			case kCauchyFlow       : InitCauchyFlow(hidFor);       break;
 			case kQGaussConst      : InitQGaussConst(hidFor);      break;
 			case kQGaussFlow       : InitQGaussFlow(hidFor);       break;
+			case kTwoGenGaussConst : InitTwoGenGaussConst(hidFor); break;
 			default: std::cerr << "MFIT case not recognized...\n";
 		}
 		switch( fHistType )
@@ -433,6 +433,11 @@ public:
 	~MFit()
 	{
 		if(ffit) delete ffit;
+	}
+
+	TString GetName()
+	{
+		return myName;
 	}
 
 	/*
@@ -567,6 +572,7 @@ public:
 			case kKaplanFlow       : DrawKaplanFlow();       break; // 5
 			case kCauchyConst      : DrawCauchyConst();      break; // 6
 			case kQGaussConst      : DrawQGaussConst();      break; //
+			case kTwoGenGaussConst : DrawTwoGenGaussConst(); break;
 		}
 	}
 	void DrawOneGenGaussConst(){
@@ -619,6 +625,13 @@ public:
 		//Pedestal
 		ffit->SetParameter(1,0); ffit->DrawClone("lsame");
 	}
+	void DrawTwoGenGaussConst(){
+		//Sum
+		ffit->SetLineWidth(2); ffit->SetLineStyle(9); ffit->SetLineColor(kYellow+2); ffit->DrawClone("lsame");
+		//Pedestal
+		ffit->SetParameter(1,0); ffit->SetParameter(4,0); ffit->DrawClone("lsame");
+	}
+
 
 
 	/*
@@ -778,25 +791,32 @@ public:
 	 */
 	void InitTwoGenGaussConst(TH1 * hidFor ) {
 		myName = "2Gen.Gauss+const.";
-		double lr=-0.5, ur=1.5;
+
+		double lr=fitmin, ur=fitmax;
 
 		ffit = new TF1("ffit_GGC", TwoGenGaussConst, lr , ur, 7 );
-		ffit->SetParNames("background", "yield_near", "width_near","power_near", "yield_far", "width_far","power_far");
+		ffit->SetParNames("background", "yield1", "width1","power1", "yield2", "width2","power2");
 
-		binUnderLeft  = hidFor->FindBin(.45);
-		binUnderRight = hidFor->FindBin(.65);
+		if( fHistType==0 ) { // deta background region
+			binUnderLeft  = hidFor->FindBin(1.);
+			binUnderRight = hidFor->FindBin(1.5);
+		}
+		if( fHistType==1 ) { // dphi background region
+			binUnderLeft  = hidFor->FindBin(0.45);
+			binUnderRight = hidFor->FindBin(0.65);
+		}
 		undereve = hidFor->Integral(binUnderLeft, binUnderRight)/(binUnderRight-binUnderLeft);
 
-		double maxVal = hidFor->GetMaximum();
-		//double minVal = hidFor->GetMinimum();
-		double yield  = maxVal-undereve;
+		double width = hidFor->GetRMS()/sqrt(2.);
+		double yield  = hidFor->Integral( hidFor->FindBin(0.0), hidFor->FindBin(2.*width))-undereve;
 
-		ffit->SetParameters( undereve, yield, 0.3, 2., yield, 0.3, 2. );
+		ffit->SetParameters( undereve, yield/2., width*2., 2., yield/2., width/2., 2. );
 
-		ffit->SetParLimits( 1, 0, 1e7 );
+		//ffit->SetParLimits( 0, 0, 1e7 );
+		//ffit->SetParLimits( 1, 0, 1e7 );
 		ffit->SetParLimits( 2, 0, 3. );
 		ffit->SetParLimits( 3, 0.5, 5 );
-		ffit->SetParLimits( 4, 0, 1e7 );
+		//ffit->SetParLimits( 4, 0, 1e7 );
 		ffit->SetParLimits( 5, 0, 3. );
 		ffit->SetParLimits( 6, 0.5, 5 );
 

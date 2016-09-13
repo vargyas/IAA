@@ -7,19 +7,6 @@
 // pp_ALL_CUT1_pp276_withSDD_list100.root
 // pp_ALL_noSDDCut1_pp276_ESD_pass2_v2.13_withoutSDD_very_long_lists.root
 
-// Common bins: 
-const double pttBorders[] = {4, 6, 8, 15};
-const double ptaBorders[] = {2, 3, 4, 6, 8};
-const double centBorders[]= {0, 10, 20, 40, 60, 90};
-const int numCent = 5;
-const int numPtt  = 3;
-const int numPta  = 4;
-
-// PP bins:
-const double vertBorters[] = {-10, -5, 0, 5, 10};
-const double phiBorders[]  = {0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6};
-const int numVert = 4;
-const int numPhi  = 8;
 
 
 // Flips histogram around 0, creates a new with half the bins
@@ -58,6 +45,25 @@ class FilipHistos
         TH1D * hDEta[5][10][10]; // flipped histos
 
         FilipHistos(TString type){
+
+
+
+			// Common bins:
+			const double pttBorders[] = {4, 6, 8, 15};
+			const double ptaBorders[] = {2, 3, 4, 6, 8};
+			const double centBorders[]= {0, 10, 20, 40, 60, 90};
+			const int numCent = 5;
+			const int numPtt  = 3;
+			const int numPta  = 4;
+
+			// PP bins:
+			const double vertBorters[] = {-10, -5, 0, 5, 10};
+			const double phiBorders[]  = {0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6};
+			const int numVert = 4;
+			const int numPhi  = 8;
+
+
+
             cout << "Filip histos being initialized for [" << type << "]" << endl;
             fCollType = type;
 
@@ -65,8 +71,6 @@ class FilipHistos
             if(fCollType=="AA" or fCollType=="PbPb"){
                 cout << "loading Filip PB+PB " << endl;
                 inName = "../data/others/etaOut_Cut1_WingCorr1_EffRef_Skip0000_MixLast64_Fit1Range1.6_ppzbin_PPnoSDD_CentTPC.root";
-                //inName = "../data/others/etaOut_Cut1_WingCorr0_EffRef_Skip0000_MixLast64_Fit1Range1.6_ppzbin_PPnoSDD.root";
-                //inName = "../data/others/etaOut_Cut3_WingCorr0_EffRef_Skip0000_MixLast66_Fit0Range1.6_ppzbin_PPwSDD.root";
                 infile = TFile::Open(inName);
 
                 for(int ic=0; ic<numCent; ic++){
@@ -85,9 +89,7 @@ class FilipHistos
             // this needs to be summed and normalized
             if(fCollType=="PP" or fCollType=="pp") {
                 cout << "loading Filip P+P " << endl;
-                //inName = "../data/others/pp_ALL_CUT1_pp276_withSDD_list100.root";
                 inName = "../data/others/pp_ALL_noSDDCut1_pp276_ESD_pass2_v2.13_withoutSDD_very_long_lists.root";
-                //inName = "../data/others/pp_ALL_noSDDCut3_pp276_ESD_pass2_v2.13_withoutSDD_very_long_lists.root";
                 infile = TFile::Open(inName);
                 TH1D * htrigg[10];
 
