@@ -137,12 +137,12 @@ class MPlot
         TPad * fPad;              
         TPad * fPadRatio;
 
-        MPlot()
-        {
-            Reset();
-            fSplitRatio=0.4;
-            Initialize(0,"","",false);
-        }
+		MPlot()
+		{
+			Reset();
+			fSplitRatio=0.4;
+			Initialize(0,"","",false);
+		}
 
         MPlot(int index, TString xlab, TString ylab, bool sp, float splitratio=0.4){
             Reset();
@@ -196,10 +196,11 @@ class MPlot
             TString cname = Form("c%d",fNameIndex);
             TString pname = Form("p%d",fNameIndex);
             // mc-style formatting, brute force now.
-            float sdx = 300;
-            float sdy = 100;
-            int ncolumns = 5;
-            //int ic0 = fNameIndex-1;
+			//float sdx = 300;
+			//float sdy = 100;
+			//int ncolumns = 5;
+
+			//int ic0 = fNameIndex-1;
             //int cx = sdx*(ic0%ncolumns)+10;
             //int cy = sdy*(ic0-ic0%ncolumns)/ncolumns+10;
             fCanvas = new TCanvas(cname, cname, 440, 440); // should be formatted here
@@ -272,7 +273,6 @@ class MPlot
             int N = hList->GetEntries();
             for(int ihist=0; ihist<N; ihist++)
             {
-                int Nbins = ((TH1*)(hList->At(ihist)))->GetNbinsX();
                 int ixmin = ((TH1*)(hList->At(ihist)))->FindBin(xmin);
                 int ixmax = ((TH1*)(hList->At(ihist)))->FindBin(xmax);
                 for(int ibin=ixmin; ibin<ixmax; ibin++){
@@ -579,7 +579,7 @@ class MPlot
 //            fLowerSplitPad = NULL;
         }
 
-        //ClassDef(MPlot,1)
+		//ClassDef(MPlot,1)
 };
 
 #endif /* MPLOT_H */

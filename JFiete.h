@@ -1,7 +1,12 @@
-//#include <TFile.h>
-//#include <TString.h>
-//#include <TH2D.h>
-//#include <TH1D.h>
+#include <TGraphAsymmErrors.h>
+#include <TFile.h>
+#include <TString.h>
+#include <TH2D.h>
+#include <TH1D.h>
+#include <TMath.h>
+#include <iostream>
+
+using namespace std;
 
 const double PttBinPiete[] = { 2, 3, 4, 8, 15 };
 const int NPttBinPiete = 4;
@@ -15,7 +20,6 @@ const int NCentBinPiete = 8; // loading only central here
 class JFieteCF {
 
     public:
-
         TFile * fInRoot;
         TString fInRootName;
         TH2D * fDphi2D[NPttBinPiete][NPtaBinPiete][3];
@@ -81,25 +85,25 @@ class JFieteCF {
                 if( c0  < 10 ) { iCent=0; }
                 if( c0 > 50 ){ iCent = 2; }
             }
-            cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
+			cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
 
             if( iCent < 0 ) return 0x0;
             for( int i=0;i<NPttBinPiete;i++ ){
                 if( ptt0 < PttBinPiete[i+1]-1e-4 ) {
-                    iPtt = i;continue;
+					iPtt = i;continue;
                 }
             }
-            cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
-            if( iPtt < 0 ) return 0x0;
+			cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
+			if( iPtt < 0 ) return 0x0;
             for( int i=0;i<NPtaBinPiete;i++ ){
                 if( pta0 < PtaBinPiete[i+1]-1e-4 ) {
                     iPta = i;break;
                 }
             }
             if( iPta < 0 ) return 0x0;
-            cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
-             fDeta1D[iPtt][iPta][iCent]->Print();
-            return fDeta1D[iPtt][iPta][iCent];
+			cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
+			 fDeta1D[iPtt][iPta][iCent]->Print();
+			return fDeta1D[iPtt][iPta][iCent];
         }
 
 };

@@ -1,6 +1,8 @@
 #ifndef MTOOLS_H
 #define MTOOLS_H
 
+#include <TPad.h>
+#include <TROOT.h>
 #include "mfit.h"
 
 /* 
@@ -52,46 +54,48 @@ public:
         }
     }
     // --------------------------------------------
-    // Substracts background (bg)
-    // from a given histogram (h)
+	// Substracts background (bg)
+	// from a given histogram (h)
     // --------------------------------------------
-    void subtractConstTH1(TH1 * h, double bg)
-    {
+	void subtractConstTH1(TH1 * h, double bg)
+	{
         double y, yerr;
-        for(int ib=1; ib<=h->GetNbinsX(); ib++){
-            y = h->GetBinContent(ib)-bg;
-            yerr = h->GetBinError(ib)/h->GetBinContent(ib);
+		for(int ib=1; ib<=h->GetNbinsX(); ib++){
+			y = h->GetBinContent(ib)-bg;
+			yerr = h->GetBinError(ib)/h->GetBinContent(ib);
 
-            h->SetBinContent(ib, y);
-            h->SetBinError(ib, yerr*y);
+			h->SetBinContent(ib, y);
+			h->SetBinError(ib, yerr*y);
         }
     }
-    TH1D* subtractConstTH1(TH1 *h, double bg, double ebg)
-    {
-        int nb =h->GetNbinsX();
-        TString hname = h->GetName();
+	TH1D* subtractConstTH1(TH1 *h, double bg, double ebg, bool adderror=true)
+	{
+		int nb =h->GetNbinsX();
+		TString hname = h->GetName();
 
-        TH1D *hsig  = (TH1D*) h->Clone(Form("%s_sig",hname.Data()));
-        hsig->Reset();
+		TH1D *hsig  = (TH1D*) h->Clone(Form("%s_sig",hname.Data()));
+		hsig->Reset();
+		double val = 0;
+		double err = 0;
 
-        for(int ib=1; ib<=nb; ib++){
-            double val = h->GetBinContent(ib);
-            double err = h->GetBinError(ib);
-            hsig->SetBinContent(ib,val-bg);
-            hsig->SetBinError(ib,sqrt(err*err +  ebg * ebg));
-        }
-        return hsig;
-    }
-    void subtractConstTH1(TH1 * h) // fit and subtract constant from deta histogram
-    {
-        MFit * fit = new MFit(0, 0, h, 0, 1.6, false); // larger range for better backg. estimation
-        h->Fit( fit->ffit, "IEMR");
-        double bg = fit->ffit->GetParameter(0);
-        double bgerr = fit->ffit->GetParError(0);
-        subtractConstTH1(h, bg);
-        //return h;
-        delete fit;
-    }
+		for(int ib=1; ib<=nb; ib++){
+			val = h->GetBinContent(ib);
+			err = h->GetBinError(ib);
+			hsig->SetBinContent(ib,val-bg);
+			adderror ? hsig->SetBinError(ib,(val)*sqrt(err/val*err/val + ebg*ebg/bg/bg)) : hsig->SetBinError(ib,(val)*err/val);
+		}
+		return hsig;
+	}
+	void subtractConstTH1(TH1 * h) // fit and subtract constant from deta histogram
+	{
+		MFit * fit = new MFit(0, 0, h, 0, 1.6, false); // larger range for better backg. estimation
+		h->Fit( fit->ffit, "IEMR");
+		double bg = fit->ffit->GetParameter(0);
+		double bgerr = fit->ffit->GetParError(0);
+		subtractConstTH1(h, bg);
+		//return h;
+		delete fit;
+	}
 
 
 
@@ -106,7 +110,7 @@ public:
         h->Scale(1./scale);
     }
     // --------------------------------------------
-    // Shift histogram to another histogram's tail,
+	// Shift histogram to another histogram's tail,
     // tail is defined similarly
     // --------------------------------------------
     void shiftToThisTail(TH1 * h2, TH1 * h1, double xmin, double xmax){
@@ -121,20 +125,20 @@ public:
             h2->SetBinContent(ib+1, h2->GetBinContent(ib+1)+shift1-shift2);
         }
     }
-    // --------------------------------------------
-    // Scale histogram to another histogram's tail,
-    // tail is defined similarly
-    // --------------------------------------------
-    void scaleToThisTail(TH1 * h2, TH1 * h1, double xmin, double xmax) {
-        int xBinMin1 = h1->FindBin(xmin);
-        int xBinMax1 = h1->FindBin(xmax);
-        int xBinMin2 = h2->FindBin(xmin);
-        int xBinMax2 = h2->FindBin(xmax);
+	// --------------------------------------------
+	// Scale histogram to another histogram's tail,
+	// tail is defined similarly
+	// --------------------------------------------
+	void scaleToThisTail(TH1 * h2, TH1 * h1, double xmin, double xmax) {
+		int xBinMin1 = h1->FindBin(xmin);
+		int xBinMax1 = h1->FindBin(xmax);
+		int xBinMin2 = h2->FindBin(xmin);
+		int xBinMax2 = h2->FindBin(xmax);
 
-        double shift1 = h1->Integral(xBinMin1, xBinMax1)/double(xBinMax1-xBinMin1);
-        double shift2 = h2->Integral(xBinMin2, xBinMax2)/double(xBinMax2-xBinMin2);
-        h2->Scale(1./shift2*shift1);
-    }
+		double shift1 = h1->Integral(xBinMin1, xBinMax1)/double(xBinMax1-xBinMin1);
+		double shift2 = h2->Integral(xBinMin2, xBinMax2)/double(xBinMax2-xBinMin2);
+		h2->Scale(1./shift2*shift1);
+	}
 
     // --------------------------------------------
     // Returns a histogram, which flips the given 
@@ -600,43 +604,43 @@ public:
        return h1;
     }
 
-    void DivideWithX(TH1D * h)
-    {
-        const int n = h->GetNbinsX();
-        double xval = 0;
-        double yval = 0;
-        for(int ib=1; ib<=n; ib++)
-        {
-            xval = h->GetBinCenter(ib);
-            yval = h->GetBinContent(ib);
-            h->SetBinContent(ib, yval/xval);
-        }
-    }
-    const TH1D * TGraph2TH1D(const TGraphAsymmErrors * gr)
-    {
-        const int nbins = gr->GetN();
-        double x[nbins+1], y[nbins], yerr[nbins];
-        double xerrl=0., xerrh=0.;
-        for(int ib=0; ib<nbins; ib++)
-        {
-            (*gr).GetPoint(ib, x[ib], y[ib]);
-            xerrl = (*gr).GetErrorXlow(ib);
-            xerrh = (*gr).GetErrorXhigh(ib);
-            x[ib] = x[ib]-xerrl;
-            yerr[ib] = (*gr).GetErrorY(ib);
-        }
-        x[nbins] = x[nbins-1]+xerrh;
+	void DivideWithX(TH1D * h)
+	{
+		const int n = h->GetNbinsX();
+		double xval = 0;
+		double yval = 0;
+		for(int ib=1; ib<=n; ib++)
+		{
+			xval = h->GetBinCenter(ib);
+			yval = h->GetBinContent(ib);
+			h->SetBinContent(ib, yval/xval);
+		}
+	}
+	const TH1D * TGraph2TH1D(const TGraphAsymmErrors * gr)
+	{
+		const int nbins = gr->GetN();
+		double x[nbins+1], y[nbins], yerr[nbins];
+		double xerrl=0., xerrh=0.;
+		for(int ib=0; ib<nbins; ib++)
+		{
+			(*gr).GetPoint(ib, x[ib], y[ib]);
+			xerrl = (*gr).GetErrorXlow(ib);
+			xerrh = (*gr).GetErrorXhigh(ib);
+			x[ib] = x[ib]-xerrl;
+			yerr[ib] = (*gr).GetErrorY(ib);
+		}
+		x[nbins] = x[nbins-1]+xerrh;
 
-        TH1D * h = new TH1D(Form("h%s",gr->GetName()), "", nbins-1, x);
-        for(int ib=0; ib<nbins; ib++)
-        {
-            //cout << x[ib] << " - " << x[ib+1] << endl;
-            h->SetBinContent(ib+1, y[ib]);
-            h->SetBinError(ib+1, yerr[ib]);
-        }
-        h->SetTitle( gr->GetTitle() );
-        return h;
-    }
+		TH1D * h = new TH1D(Form("h%s",gr->GetName()), "", nbins-1, x);
+		for(int ib=0; ib<nbins; ib++)
+		{
+			//cout << x[ib] << " - " << x[ib+1] << endl;
+			h->SetBinContent(ib+1, y[ib]);
+			h->SetBinError(ib+1, yerr[ib]);
+		}
+		h->SetTitle( gr->GetTitle() );
+		return h;
+	}
 
 //    TH1D * ProjectionCircX(TH2D * h2, const char *name, Int_t firstbin, Int_t lastbin, Double_t R, Option_t * option) const
 //    {
