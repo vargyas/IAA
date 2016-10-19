@@ -34,31 +34,31 @@ void CompareIAAerrors(int ic, int iptt, int ipta, TH1D * hPP_raw, TH1D * hPP_mix
     double err_iaa=0;
     for(int ib=1; ib<=err_code->GetNbinsX(); ib++)
     {
-		if( hPP_raw->GetBinContent(ib)!=0 ) errPP_raw = hPP_raw->GetBinError(ib) / hPP_raw->GetBinContent(ib);
-		else errPP_raw = -1e5;
+        if( hPP_raw->GetBinContent(ib)!=0 ) errPP_raw = hPP_raw->GetBinError(ib) / hPP_raw->GetBinContent(ib);
+        else errPP_raw = -1e5;
         errPP_mix = hPP_mix->GetBinError(ib) / hPP_mix->GetBinContent(ib);
 
-		if( hAA_raw->GetBinContent(ib)!=0 ) errAA_raw = hAA_raw->GetBinError(ib) / hAA_raw->GetBinContent(ib);
-		else errAA_raw = -1e5;
+        if( hAA_raw->GetBinContent(ib)!=0 ) errAA_raw = hAA_raw->GetBinError(ib) / hAA_raw->GetBinContent(ib);
+        else errAA_raw = -1e5;
         errAA_mix = hAA_mix->GetBinError(ib) / hAA_mix->GetBinContent(ib);
 
-		err_code->SetBinContent(ib, hIAA->GetBinError(ib)/hIAA->GetBinContent(ib));
-		err_code->SetBinError(ib, 0);
+        err_code->SetBinContent(ib, hIAA->GetBinError(ib)/hIAA->GetBinContent(ib));
+        err_code->SetBinError(ib, 0);
 
         err_iaa = errPP_raw + errPP_mix + errAA_raw + errAA_mix;
-		//std::cout << ic << "\t" << iptt << "\t" << ipta << std::endl;
-		//std::cout << errPP_raw << "\t" <<  errPP_mix << "\t" << errAA_raw << "\t" << errAA_mix << std::endl << std::endl;
-		err_calc->SetBinContent(ib, err_iaa);
-		err_calc->SetBinError(ib, 0);
+        //std::cout << ic << "\t" << iptt << "\t" << ipta << std::endl;
+        //std::cout << errPP_raw << "\t" <<  errPP_mix << "\t" << errAA_raw << "\t" << errAA_mix << std::endl << std::endl;
+        err_calc->SetBinContent(ib, err_iaa);
+        err_calc->SetBinError(ib, 0);
     }
 
-	MPlot * mciaa = new MPlot(99999, "#Delta#eta", "relative error on I_{AA}", false);
+    MPlot * mciaa = new MPlot(99999, "#Delta#eta", "relative error on I_{AA}", false);
     std::vector<TH1*> hList = {err_code, err_calc};
     std::vector<TString> legList = {"code", "calc."};
     mciaa->addHList(hList, legList, "PE");
-	mciaa->SetLimitsXY(0,0.3,0,1);
+    mciaa->SetLimitsXY(0,0.3,0,1);
     mciaa->Draw();
-	mciaa->Save(Form("../figs/CompareIAAerrors/IAAErr_C%dT%dA%d",ic,iptt,ipta));
+    mciaa->Save(Form("../figs/CompareIAAerrors/IAAErr_C%dT%dA%d",ic,iptt,ipta));
 }
 
 
@@ -148,7 +148,7 @@ TGraphAsymmErrors * publishedIAA(int icase)
 //    mt->subtractConstTH1(h2, fit->GetParameter(0) );
 //    double yield = h2->Integral(h2->FindBin(1e-6), h2->FindBin(1.1));
 //    delete h2;
-//	  delete mt;
+//    delete mt;
 //    return yield;
 //}
 
@@ -172,41 +172,41 @@ int main()
 
     // -------------------------------------
     // SETUP
-	const double minpt = 4; // GeV
-	const double etaCut = 1.0;
-	const double phiCut = 0.1;
+    const double minpt = 4; // GeV
+    const double etaCut = 1.0;
+    const double phiCut = 0.1;
 
     const TString dataDir = "/Users/vargyas/Work/ALICE/IAA/data/jcorran/"; 
 
     // initalizing  pp
 //    const TString inNamePP = dataDir+"newJCORRAN/JDiHadronCorr_legotrain_allTrigg-CF_pp-903_20160428-2137-2760GeV_LHC11a_p4_AOD113_withSDD.root";
-	//const TString inNamePP = dataDir+"modularJCORRAN/JDiHadronCorr_legotrain_allTrigg-CF_pp-1116_20160818-1832-2760GeV_LHC11a_p4_AOD113_withSDD.root";
-	//const TString inNamePP = dataDir+"modularJCORRANvtx/JDiHadronCorr_legotrain_allTrigg-CF_pp-1139_20160905-1807-2760GeV_LHC11a_p4_AOD113_noSDD.root";
+    //const TString inNamePP = dataDir+"modularJCORRAN/JDiHadronCorr_legotrain_allTrigg-CF_pp-1116_20160818-1832-2760GeV_LHC11a_p4_AOD113_withSDD.root";
+    //const TString inNamePP = dataDir+"modularJCORRANvtx/JDiHadronCorr_legotrain_allTrigg-CF_pp-1139_20160905-1807-2760GeV_LHC11a_p4_AOD113_noSDD.root";
     const TString inNamePP = dataDir+"modularJCORRANvtxNewbinning/JDiHadronCorr_legotrain_allTrigg-CF_pp-1155_20160929-2048-2760GeV_LHC11a_p4_AOD113_noSDD.root"; // dEta < 1.6
-	mc[0][0] = new MCorr( kPP, inNamePP, "LHC11a", "113", "0", "withSDD", "TPCOnly", phiCut, etaCut, -5, minpt, 15, 0, true );
-	mc[0][0]->Initialize();
+    mc[0][0] = new MCorr( kPP, inNamePP, "LHC11a", "113", "0", "withSDD", "TPCOnly", phiCut, etaCut, -5, minpt, 15, 0, true );
+    mc[0][0]->Initialize();
 
     // initalizing  PbPb 
 //    const TString inNameAA = dataDir+"newJCORRAN/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2594_20160513-1811_LHC10h_AOD160_runlist_3_rebinned4Filip.root";
-	//const TString inNameAA = dataDir+"newJCORRAN/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2594_20160513-1811_LHC10h_AOD160_runlist_2.root";
-	//const TString inNameAA = dataDir+"modularJCORRAN/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2910_20160818-2237_runlist_3-LHC10h_AOD86_MgFpMgFm_rebinned4Filip.root";
-	// const TString inNameAA = dataDir+"modularJCORRAN/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2871_20160804-1855_runlist_3-LHC10h_AOD86_MgFpMgFm.root";
-	//const TString inNameAA = dataDir+"noGeomAccCorr/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2009_20151123-1916_runlist_3-LHC10h_AOD86_MgFpMgFm.root";
+    //const TString inNameAA = dataDir+"newJCORRAN/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2594_20160513-1811_LHC10h_AOD160_runlist_2.root";
+    //const TString inNameAA = dataDir+"modularJCORRAN/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2910_20160818-2237_runlist_3-LHC10h_AOD86_MgFpMgFm_rebinned4Filip.root";
+    // const TString inNameAA = dataDir+"modularJCORRAN/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2871_20160804-1855_runlist_3-LHC10h_AOD86_MgFpMgFm.root";
+    //const TString inNameAA = dataDir+"noGeomAccCorr/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2009_20151123-1916_runlist_3-LHC10h_AOD86_MgFpMgFm.root";
 
     const TString inNameAA = dataDir+"modularJCORRANvtxNewbinning/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2978_20160929-2054_runlist_3-LHC10h_AOD86_MgFpMgFm.root";
 
-	//const TString inNameAA = dataDir+"modularJCORRANvtx/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2950_20160908-1834-LHC11h_AOD115_fullTPCFlow.root";
-	//const TString inNameAA = dataDir+"modularJCORRANvtx/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2956_20160912-1725_runlist_1-LHC11h_AOD115_FemtoMinusPlusFemtoPlus.root";
-	mc[1][0] = new MCorr( kPbPb, inNameAA, "LHC10h", "86", "3", "", "TPCOnly", phiCut, etaCut, -5, minpt, 15., 0, true );
-	mc[1][0]->Initialize();
+    //const TString inNameAA = dataDir+"modularJCORRANvtx/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2950_20160908-1834-LHC11h_AOD115_fullTPCFlow.root";
+    //const TString inNameAA = dataDir+"modularJCORRANvtx/JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2956_20160912-1725_runlist_1-LHC11h_AOD115_FemtoMinusPlusFemtoPlus.root";
+    mc[1][0] = new MCorr( kPbPb, inNameAA, "LHC10h", "86", "3", "", "TPCOnly", phiCut, etaCut, -5, minpt, 15., 0, true );
+    mc[1][0]->Initialize();
     // -------------------------------------
 
 
-	// fit, cent, setup, trigger, assoc
+    // fit, cent, setup, trigger, assoc
     int kF=5, kC=5, kS=3, kT=5, kA=7;
 
-	for(int it=0; it<2; it++)
-	{
+    for(int it=0; it<2; it++)
+    {
         Cent[it] = mc[it][0]->fhst->GetBin("Cent");   NumCent[it] = Cent[it]->Size();
         Vtx[it]  = mc[it][0]->fhst->GetBin("Vtx");    NumVtx[it]  = Vtx[it]->Size();
         PTt[it]  = mc[it][0]->fhst->GetBin("PTt");    NumPtt[it]  = PTt[it]->Size();
@@ -216,215 +216,215 @@ int main()
     }
     const int minPtt = PTt[0]->GetBin(minpt);
 
-	std::cout << "\nloading input files done...\n" << endl;
+    std::cout << "\nloading input files done...\n" << endl;
 
-	if( inNameAA.Contains("rebinned4Filip") ) kC=4;
-	//else bPlotFilip = false;
+    if( inNameAA.Contains("rebinned4Filip") ) kC=4;
+    //else bPlotFilip = false;
 
 
-	//const TString fitnames[] = {"Gauss fit", "Gen.Gauss fit", "Kaplan fit", "Cauchy fit", "QGauss fit"};
-	//const TString subnames[] = {"(flat)", "(v_{2})", "(#eta-gap)"};
+    //const TString fitnames[] = {"Gauss fit", "Gen.Gauss fit", "Kaplan fit", "Cauchy fit", "QGauss fit"};
+    //const TString subnames[] = {"(flat)", "(v_{2})", "(#eta-gap)"};
 
     // -------------------------------------
     // processing correlation
     // -------------------------------------
-	const double fitrange_eta = 1.4;
-	const double fitrange_phi = 0.4;
+    const double fitrange_eta = 1.4;
+    const double fitrange_phi = 0.4;
 
-	for( int itype=0; itype<2; itype++ ){
-		for( int isetup=0; isetup<1; isetup++ )
-		{
+    for( int itype=0; itype<2; itype++ ){
+        for( int isetup=0; isetup<1; isetup++ )
+        {
 //            mc[itype][isetup]->DoQA();
 
-			mc[itype][isetup]->LoadDEtaDPhi();
-			mc[itype][isetup]->ProjectDEtaDPhi(1.0);
-			//mc[itype][isetup]->DrawWingCorr();
+            mc[itype][isetup]->LoadDEtaDPhi();
+            mc[itype][isetup]->ProjectDEtaDPhi(1.0);
+            //mc[itype][isetup]->DrawWingCorr();
 
 
-			mc[itype][isetup]->LoadDEtaHistos();
-//			mc[itype][isetup]->LoadDPhiHistos();
+            mc[itype][isetup]->LoadDEtaHistos();
+//          mc[itype][isetup]->LoadDPhiHistos();
 
 //            mc[itype][isetup]->Draw2DHistos();
 
             mc[itype][isetup]->FitDEtaHistos("EMRNSQ", fitrange_eta); //IEMRNSQ or WLRNSQ
 
-			mc[itype][isetup]->DrawCorr2D1D(true,kDEta);
-			mc[itype][isetup]->DrawRaw2D1D();
+            mc[itype][isetup]->DrawCorr2D1D(true,kDEta);
+            mc[itype][isetup]->DrawRaw2D1D();
             mc[itype][isetup]->DrawDEta(1);
-			//mc[itype][isetup]->DrawDEta(true, 2);
+            //mc[itype][isetup]->DrawDEta(true, 2);
 
             //mc[itype][isetup]->DrawRaw2D1D();
-//			mc[itype][isetup]->DrawRawMix();
-//			mc[itype][isetup]->DrawDPhi(true);
-//			mc[itype][isetup]->DrawFitQA(true);
-//			mc[itype][isetup]->Draw2DHistos();
+//          mc[itype][isetup]->DrawRawMix();
+//          mc[itype][isetup]->DrawDPhi(true);
+//          mc[itype][isetup]->DrawFitQA(true);
+//          mc[itype][isetup]->Draw2DHistos();
         }
     }  
 
 
-	// -------------------------------------
-	// create IAA from the MCorr objects
-	// -------------------------------------
-	MIaa * miaa = new MIaa(mc[0][0], mc[1][0]);
-	miaa->CreateIAAdeta();
-	miaa->CreateIAApta();
+    // -------------------------------------
+    // create IAA from the MCorr objects
+    // -------------------------------------
+    MIaa * miaa = new MIaa(mc[0][0], mc[1][0]);
+    miaa->CreateIAAdeta();
+    miaa->CreateIAApta();
 
-	// -------------------------------------
-	// load Filip's IAA preliminary histos
-	// with loadFilipIAAfinal.h
-	// -------------------------------------
-	FilipIAA * iaafilip = new FilipIAA();
+    // -------------------------------------
+    // load Filip's IAA preliminary histos
+    // with loadFilipIAAfinal.h
+    // -------------------------------------
+    FilipIAA * iaafilip = new FilipIAA();
 
-	// -------------------------------------
-	// load Filip's correlation
-	// histos with loadFilip.h
-	// -------------------------------------
-	FilipHistos * hfilip[2];
-	hfilip[0] = new FilipHistos("PP");
-	hfilip[1] = new FilipHistos("AA");
-
-
-	MTools * mt = new MTools();
+    // -------------------------------------
+    // load Filip's correlation
+    // histos with loadFilip.h
+    // -------------------------------------
+    FilipHistos * hfilip[2];
+    hfilip[0] = new FilipHistos("PP");
+    hfilip[1] = new FilipHistos("AA");
 
 
-
-	// -------------------------------------
-	//  PLOTTING PART
-	// -------------------------------------
-	int iplot = 1000;
-	std::vector<TH1*>    hList;
-	std::vector<TString> legList;
-
-	for(int ic=0; ic<NumCent[1]; ic++){
-		for(int iptt=minPtt; iptt<NumPtt[1]; iptt++){
-			for(int ipta=2; ipta<NumPta[1]; ipta++){
-				if( PTt[1]->At(iptt) <= PTa[1]->At(ipta) )
-					continue;
-				CompareIAAerrors(ic,iptt,ipta,(TH1D*)mc[0][0]->hDEtaRaw[0][iptt][ipta], (TH1D*)mc[0][0]->hDEtaMix[0][iptt][ipta], (TH1D*)mc[1][0]->hDEtaRaw[ic][iptt][ipta], (TH1D*)mc[1][0]->hDEtaMix[ic][iptt][ipta], (TH1D*)miaa->hIAA_deta_1d[0][ic][iptt][ipta]);
-			}
-		}
-	}
+    MTools * mt = new MTools();
 
 
-	// -------------------------------------
-	// PLOTTING Filip Delta Eta
-	// -------------------------------------
-	TH1D * htmp_deta_1d = nullptr;
-	TH1D * htmp_deta_2d = nullptr;
-	for(int itype=0; itype<2; itype++)
-	{
-		for(int ic=0; ic<NumCent[itype]; ic++){
-			for(int iptt=minPtt; iptt<NumPtt[1]; iptt++){
-				for(int ipta=2; ipta<NumPta[1]; ipta++){
-					if( PTt[1]->At(iptt) <= PTa[1]->At(ipta) )
-						continue;
 
-					//htmp_deta_1d = mt->RebinHistoToOther((TH1D*)mc[itype][0]->hDEtaSig[2][ic][iptt][ipta], (TH1D*)hfilip[itype]->hDEta[ic][iptt-1][ipta-2]);
-					//htmp_deta_2d = mt->RebinHistoToOther((TH1D*)mc[itype][0]->hDEtaSig2D[2][ic][iptt][ipta], (TH1D*)hfilip[itype]->hDEta[ic][iptt-1][ipta-2]);
-					//hList={ (TH1D*)hfilip[itype]->hDEta[ic][iptt-1][ipta-2], htmp_deta_1d, htmp_deta_2d };
-					//mc[itype][0]->hDEtaSig[2][ic][iptt][ipta]->Print();
-					// mc[itype][0]->hDEtaSig2D[2][ic][iptt][ipta]->Print();
+    // -------------------------------------
+    //  PLOTTING PART
+    // -------------------------------------
+    int iplot = 1000;
+    std::vector<TH1*>    hList;
+    std::vector<TString> legList;
 
-					hList={ (TH1D*)hfilip[itype]->hDEta[ic][iptt-1][ipta-2], (TH1D*)mc[itype][0]->hDEtaSig[2][ic][iptt][ipta], (TH1D*)mc[itype][0]->hDEtaSig2D[2][ic][iptt][ipta] };
-					legList={ "AN(2012)", "AN(2016) 1D", "AN(2016) 2D" };
+    for(int ic=0; ic<NumCent[1]; ic++){
+        for(int iptt=minPtt; iptt<NumPtt[1]; iptt++){
+            for(int ipta=2; ipta<NumPta[1]; ipta++){
+                if( PTt[1]->At(iptt) <= PTa[1]->At(ipta) )
+                    continue;
+                CompareIAAerrors(ic,iptt,ipta,(TH1D*)mc[0][0]->hDEtaRaw[0][iptt][ipta], (TH1D*)mc[0][0]->hDEtaMix[0][iptt][ipta], (TH1D*)mc[1][0]->hDEtaRaw[ic][iptt][ipta], (TH1D*)mc[1][0]->hDEtaMix[ic][iptt][ipta], (TH1D*)miaa->hIAA_deta_1d[0][ic][iptt][ipta]);
+            }
+        }
+    }
 
-					MPlot * mcorrfilip = new MPlot(++iplot, "|#Delta#eta|", "1/N_{trigg.}dN/d#Delta#eta",false);
 
-					mcorrfilip->addHList(hList, legList);
-					//mcorrfilip->SetLimitsX(0, 1.6);
-					if(itype>0) mcorrfilip->AddInfo( Form("Cent: %.0f-%.0f %%",Cent[1]->At(ic), Cent[1]->At(ic+1)));
-					mcorrfilip->AddInfo( Form("p_{Tt}#in %.0f-%.0f GeV", PTt[1]->At(iptt), PTt[1]->At(iptt+1) ) );
-					mcorrfilip->AddInfo( Form("p_{Ta}#in %.0f-%.0f GeV", PTa[1]->At(ipta), PTa[1]->At(ipta+1) ) );
-					mcorrfilip->Draw();
-					//mcorrfilip->SetRatioLimits(0., 2.);
+    // -------------------------------------
+    // PLOTTING Filip Delta Eta
+    // -------------------------------------
+    TH1D * htmp_deta_1d = nullptr;
+    TH1D * htmp_deta_2d = nullptr;
+    for(int itype=0; itype<2; itype++)
+    {
+        for(int ic=0; ic<NumCent[itype]; ic++){
+            for(int iptt=minPtt; iptt<NumPtt[1]; iptt++){
+                for(int ipta=2; ipta<NumPta[1]; ipta++){
+                    if( PTt[1]->At(iptt) <= PTa[1]->At(ipta) )
+                        continue;
+
+                    //htmp_deta_1d = mt->RebinHistoToOther((TH1D*)mc[itype][0]->hDEtaSig[2][ic][iptt][ipta], (TH1D*)hfilip[itype]->hDEta[ic][iptt-1][ipta-2]);
+                    //htmp_deta_2d = mt->RebinHistoToOther((TH1D*)mc[itype][0]->hDEtaSig2D[2][ic][iptt][ipta], (TH1D*)hfilip[itype]->hDEta[ic][iptt-1][ipta-2]);
+                    //hList={ (TH1D*)hfilip[itype]->hDEta[ic][iptt-1][ipta-2], htmp_deta_1d, htmp_deta_2d };
+                    //mc[itype][0]->hDEtaSig[2][ic][iptt][ipta]->Print();
+                    // mc[itype][0]->hDEtaSig2D[2][ic][iptt][ipta]->Print();
+
+                    hList={ (TH1D*)hfilip[itype]->hDEta[ic][iptt-1][ipta-2], (TH1D*)mc[itype][0]->hDEtaSig[2][ic][iptt][ipta], (TH1D*)mc[itype][0]->hDEtaSig2D[2][ic][iptt][ipta] };
+                    legList={ "AN(2012)", "AN(2016) 1D", "AN(2016) 2D" };
+
+                    MPlot * mcorrfilip = new MPlot(++iplot, "|#Delta#eta|", "1/N_{trigg.}dN/d#Delta#eta",false);
+
+                    mcorrfilip->addHList(hList, legList);
+                    //mcorrfilip->SetLimitsX(0, 1.6);
+                    if(itype>0) mcorrfilip->AddInfo( Form("Cent: %.0f-%.0f %%",Cent[1]->At(ic), Cent[1]->At(ic+1)));
+                    mcorrfilip->AddInfo( Form("p_{Tt}#in %.0f-%.0f GeV", PTt[1]->At(iptt), PTt[1]->At(iptt+1) ) );
+                    mcorrfilip->AddInfo( Form("p_{Ta}#in %.0f-%.0f GeV", PTa[1]->At(ipta), PTa[1]->At(ipta+1) ) );
+                    mcorrfilip->Draw();
+                    //mcorrfilip->SetRatioLimits(0., 2.);
                     mcorrfilip->Save(Form("../figs/Corr/Filip_DEta_T%d_C0%dT0%dA0%d", itype, ic,iptt,ipta));
-				}
-			}
-		}
-	}
-	cout << "\n Filip DeltaEta done...\n\n";
+                }
+            }
+        }
+    }
+    cout << "\n Filip DeltaEta done...\n\n";
 
-	// -------------------------------------
-	// PLOTTING Filip IAA(dEta)
-	// -------------------------------------
-	TH1D * htmp_iaa_fit_1d[5];
-	TH1D * htmp_iaa_fit_2d[5];
-	for(int ic=0; ic<NumCent[1]; ic++){
-		for(int iptt=minPtt; iptt<NumPtt[1]; iptt++){
-			for(int ipta=2; ipta<NumPta[1]; ipta++){
-				if( PTt[1]->At(iptt) <= PTa[1]->At(ipta) )
-					continue;
+    // -------------------------------------
+    // PLOTTING Filip IAA(dEta)
+    // -------------------------------------
+    TH1D * htmp_iaa_fit_1d[5];
+    TH1D * htmp_iaa_fit_2d[5];
+    for(int ic=0; ic<NumCent[1]; ic++){
+        for(int iptt=minPtt; iptt<NumPtt[1]; iptt++){
+            for(int ipta=2; ipta<NumPta[1]; ipta++){
+                if( PTt[1]->At(iptt) <= PTa[1]->At(ipta) )
+                    continue;
 
-				MPlot * miaafilip = new MPlot(++iplot, "|#Delta#eta|", "I_{AA}",false);
-				hList.clear(); legList.clear();
+                MPlot * miaafilip = new MPlot(++iplot, "|#Delta#eta|", "I_{AA}",false);
+                hList.clear(); legList.clear();
 
-				for(int ifit=0; ifit<5; ifit++)
-				{
-					htmp_iaa_fit_1d[ifit] = (TH1D*)mt->RebinHistoToOther( miaa->hIAA_deta_1d[ifit][ic][iptt][ipta], hfilip[1]->hIAA[0][0][0] );
-					htmp_iaa_fit_2d[ifit] = (TH1D*)mt->RebinHistoToOther( miaa->hIAA_deta_2d[ifit][ic][iptt][ipta], hfilip[1]->hIAA[0][0][0] );
-					if(ifit==4)
-					{
-						hList.push_back(  miaa->hIAA_deta_1d[ifit][ic][iptt][ipta] );
-						hList.push_back(  miaa->hIAA_deta_2d[ifit][ic][iptt][ipta] );
-						legList.push_back( mc[0][0]->mfit_eta_1d[ifit][0][iptt][ipta]->GetName() );
-						legList.push_back( mc[0][0]->mfit_eta_2d[ifit][0][iptt][ipta]->GetName() );
-					}
-				}
+                for(int ifit=0; ifit<5; ifit++)
+                {
+                    htmp_iaa_fit_1d[ifit] = (TH1D*)mt->RebinHistoToOther( miaa->hIAA_deta_1d[ifit][ic][iptt][ipta], hfilip[1]->hIAA[0][0][0] );
+                    htmp_iaa_fit_2d[ifit] = (TH1D*)mt->RebinHistoToOther( miaa->hIAA_deta_2d[ifit][ic][iptt][ipta], hfilip[1]->hIAA[0][0][0] );
+                    if(ifit==4)
+                    {
+                        hList.push_back(  miaa->hIAA_deta_1d[ifit][ic][iptt][ipta] );
+                        hList.push_back(  miaa->hIAA_deta_2d[ifit][ic][iptt][ipta] );
+                        legList.push_back( mc[0][0]->mfit_eta_1d[ifit][0][iptt][ipta]->GetName() );
+                        legList.push_back( mc[0][0]->mfit_eta_2d[ifit][0][iptt][ipta]->GetName() );
+                    }
+                }
 
 
-				miaafilip->addHList(hList, legList, "pe", "p");
-				miaafilip->AddInfo( mc[1][0]->BuildInfo() );
-				miaafilip->AddInfo( mc[1][0]->BuildCentTitle(ic) );
-				miaafilip->AddInfo( mc[1][0]->BuildPTtTitle(iptt) );
-				miaafilip->AddInfo( mc[1][0]->BuildPTaTitle(ipta)  );
-				miaafilip->SetLimitsXY(0, 0.28, 0.5, 2.5);
-				miaafilip->Draw();
-				//miaafilip->DrawThisTGraphAsymmErrors( iaafilip->gIAAsyst[ic][iptt-1][ipta-2], "E2 same", 24, 42 );
-				miaafilip->DrawThisTGraphAsymmErrors( iaafilip->gIAAstat[ic][iptt-1][ipta-2], "PE same", 24, 1 );
-				miaafilip->AddThisEntry(iaafilip->gIAAstat[ic][iptt-1][ipta-2], "AN(2012)");
+                miaafilip->addHList(hList, legList, "pe", "p");
+                miaafilip->AddInfo( mc[1][0]->BuildInfo() );
+                miaafilip->AddInfo( mc[1][0]->BuildCentTitle(ic) );
+                miaafilip->AddInfo( mc[1][0]->BuildPTtTitle(iptt) );
+                miaafilip->AddInfo( mc[1][0]->BuildPTaTitle(ipta)  );
+                miaafilip->SetLimitsXY(0, 0.28, 0.5, 2.5);
+                miaafilip->Draw();
+                //miaafilip->DrawThisTGraphAsymmErrors( iaafilip->gIAAsyst[ic][iptt-1][ipta-2], "E2 same", 24, 42 );
+                miaafilip->DrawThisTGraphAsymmErrors( iaafilip->gIAAstat[ic][iptt-1][ipta-2], "PE same", 24, 1 );
+                miaafilip->AddThisEntry(iaafilip->gIAAstat[ic][iptt-1][ipta-2], "AN(2012)");
                 miaafilip->Save(Form("../figs/IAA/IAA_DEta_Filip2_C0%dT0%dA0%d", ic,iptt,ipta));
-			}
-		}
-	}
-	cout << "\n Filip IAA(dEta) done...\n\n";
+            }
+        }
+    }
+    cout << "\n Filip IAA(dEta) done...\n\n";
 
-	// -------------------------------------
-	// PLOTTING published IAA(pta)
-	// -------------------------------------
-	TGraphAsymmErrors * gPubIAA_c[3];  // published IAA (all 3 backg. subtraction)
-	for(int it=0; it<3; it++){ gPubIAA_c[it] = publishedIAA(it);}
+    // -------------------------------------
+    // PLOTTING published IAA(pta)
+    // -------------------------------------
+    TGraphAsymmErrors * gPubIAA_c[3];  // published IAA (all 3 backg. subtraction)
+    for(int it=0; it<3; it++){ gPubIAA_c[it] = publishedIAA(it);}
 
-	for(int ic=0; ic<NumCent[1]; ic++)
-	{
-		int iptt = mc[0][0]->fPTt->GetBin(8.);
-		// draw IAA from integral --------------------
-		MPlot * mpiaa = new MPlot(iplot++, "p_{T, assoc} [GeV]", "I_{AA}", false);
-		mpiaa->SetPalette(1); // set to full symbols
-		hList.clear(); legList.clear();
-		cout << ic << "\t" << iptt<<"\t" << endl;
-		for(int ifit=0; ifit<5; ifit++)
-		{
-			hList.push_back( (TH1D*)miaa->hIAA_eta_INT_1d[ifit][ic][iptt]);
-			//hList.push_back( (TH1D*)miaa->hIAA_eta[ifit][ic][iptt] );
-			legList.push_back( mc[0][0]->mfit_eta_1d[ifit][0][iptt][2]->GetName() );
-		}
-		mpiaa->addHList(hList, legList, "PE");
-		mpiaa->Draw();
+    for(int ic=0; ic<NumCent[1]; ic++)
+    {
+        int iptt = mc[0][0]->fPTt->GetBin(8.);
+        // draw IAA from integral --------------------
+        MPlot * mpiaa = new MPlot(iplot++, "p_{T, assoc} [GeV]", "I_{AA}", false);
+        mpiaa->SetPalette(1); // set to full symbols
+        hList.clear(); legList.clear();
+        cout << ic << "\t" << iptt<<"\t" << endl;
+        for(int ifit=0; ifit<5; ifit++)
+        {
+            hList.push_back( (TH1D*)miaa->hIAA_eta_INT_1d[ifit][ic][iptt]);
+            //hList.push_back( (TH1D*)miaa->hIAA_eta[ifit][ic][iptt] );
+            legList.push_back( mc[0][0]->mfit_eta_1d[ifit][0][iptt][2]->GetName() );
+        }
+        mpiaa->addHList(hList, legList, "PE");
+        mpiaa->Draw();
 
-		mpiaa->AddInfo( Form("Cent: %.0f-%.0f %%",Cent[1]->At(ic), Cent[1]->At(ic+1)));
-		mpiaa->AddInfo( Form("p_{Tt}#in %.0f-%.0f GeV", PTt[1]->At(iptt), PTt[1]->At(iptt+1)) );
+        mpiaa->AddInfo( Form("Cent: %.0f-%.0f %%",Cent[1]->At(ic), Cent[1]->At(ic+1)));
+        mpiaa->AddInfo( Form("p_{Tt}#in %.0f-%.0f GeV", PTt[1]->At(iptt), PTt[1]->At(iptt+1)) );
 
-		mpiaa->AddThisEntry(gPubIAA_c[0], "PRL data (flat)");
-		mpiaa->AddThisEntry(gPubIAA_c[1], "PRL data (v_{2})");
-		mpiaa->AddThisEntry(gPubIAA_c[2], "PRL data (#eta-gap)");
-		mpiaa->DrawThisTGraphAsymmErrors( gPubIAA_c[0], "PE same", 24, 1 );
-		mpiaa->DrawThisTGraphAsymmErrors( gPubIAA_c[1], "PE same", 25, 1 );
-		mpiaa->DrawThisTGraphAsymmErrors( gPubIAA_c[2], "PE same", 26, 1 );
+        mpiaa->AddThisEntry(gPubIAA_c[0], "PRL data (flat)");
+        mpiaa->AddThisEntry(gPubIAA_c[1], "PRL data (v_{2})");
+        mpiaa->AddThisEntry(gPubIAA_c[2], "PRL data (#eta-gap)");
+        mpiaa->DrawThisTGraphAsymmErrors( gPubIAA_c[0], "PE same", 24, 1 );
+        mpiaa->DrawThisTGraphAsymmErrors( gPubIAA_c[1], "PE same", 25, 1 );
+        mpiaa->DrawThisTGraphAsymmErrors( gPubIAA_c[2], "PE same", 26, 1 );
 
-		mpiaa->SetLimitsXY(0,10,0.5,3.5);
+        mpiaa->SetLimitsXY(0,10,0.5,3.5);
         mpiaa->Save(Form("../figs/IAA/IAA_INT_C0%d", ic));
-	}
-	cout << "\n Filip IAA(pta) done...\n\n";
+    }
+    cout << "\n Filip IAA(pta) done...\n\n";
 
 
 
@@ -436,7 +436,7 @@ int main()
 
 
 
-	// -------------------------------------
+    // -------------------------------------
     // create IAA(pta) histos from yields 
     // extracted by MCorr for various fits 
     // and back. subtraction
@@ -449,18 +449,18 @@ int main()
     TH1D * hICP[2][kF][kS][kT];
     std::cout << "Processing IAA(pta)\n";
 
-	for(int ifit=0; ifit<kF; ifit++)
-	{
-		for(int isetup=0; isetup<NSetup[1]; isetup++)
-		{
-			for(int ic=0; ic<NumCent[1]; ic++)
-			{
+    for(int ifit=0; ifit<kF; ifit++)
+    {
+        for(int isetup=0; isetup<NSetup[1]; isetup++)
+        {
+            for(int ic=0; ic<NumCent[1]; ic++)
+            {
                 for(int iptt=minPtt; iptt<NumPtt[1]; iptt++)
                 {
                     hIAA_eta[isetup][ifit][ic][iptt] = (TH1D*)mc[1][isetup]->hYield_eta[ifit][ic][iptt]->Clone();
                     hIAA_eta[isetup][ifit][ic][iptt]->Divide( (TH1D*)mc[0][isetup]->hYield_eta[ifit][0][iptt] );
 
-					hIAA_eta_INT[isetup][ifit][ic][iptt] = (TH1D*)mc[1][isetup]->hYield_eta_Int[ifit][ic][iptt]->Clone();
+                    hIAA_eta_INT[isetup][ifit][ic][iptt] = (TH1D*)mc[1][isetup]->hYield_eta_Int[ifit][ic][iptt]->Clone();
                     hIAA_eta_INT[isetup][ifit][ic][iptt]->Divide( (TH1D*)mc[0][isetup]->hYield_eta_Int[ifit][0][iptt] );
 
                     for(int isub=0; isub<kS; isub++)
@@ -500,46 +500,46 @@ int main()
                     TString name = Form("hIAAdEta_S%dC%dT%dA%d",isetup,ic,iptt,ipta);
                     
                     //clone AA for IAA
-					TH1D * htmpAA = (TH1D*) mc[1][isetup]->hDEtaRealFlip[ic][iptt][ipta]->Clone(name);
-					MFit * fitAA = new MFit(0,0,htmpAA, -1.6, 1.6, false); // larger range for better backg. estimation
-					htmpAA->Fit( fitAA->ffit, "IEMRNSQ");
-					mt->subtractConstTH1(htmpAA, fitAA->ffit->GetParameter(0));
+                    TH1D * htmpAA = (TH1D*) mc[1][isetup]->hDEtaRealFlip[ic][iptt][ipta]->Clone(name);
+                    MFit * fitAA = new MFit(0,0,htmpAA, -1.6, 1.6, false); // larger range for better backg. estimation
+                    htmpAA->Fit( fitAA->ffit, "IEMRNSQ");
+                    mt->subtractConstTH1(htmpAA, fitAA->ffit->GetParameter(0));
 
-					hIAAdEta[isetup][ic][iptt][ipta]         = (TH1D*) htmpAA->Clone(name);
-					hIAAdEta_ppfit[isetup][ic][iptt][ipta]   = (TH1D*) htmpAA->Clone(name);
-					hIAAdEta_ppFilip[isetup][ic][iptt][ipta] = (TH1D*) htmpAA->Clone(name);
+                    hIAAdEta[isetup][ic][iptt][ipta]         = (TH1D*) htmpAA->Clone(name);
+                    hIAAdEta_ppfit[isetup][ic][iptt][ipta]   = (TH1D*) htmpAA->Clone(name);
+                    hIAAdEta_ppFilip[isetup][ic][iptt][ipta] = (TH1D*) htmpAA->Clone(name);
 
                     //use pp histo for IAA
-					TH1D * htmpPP = (TH1D*) mc[0][isetup]->hDEtaRealFlip[0][iptt][ipta]->Clone(name+"tmp");
-					MFit * fitPP = new MFit(0,0,htmpPP, -1.6, 1.6, false);
-					htmpPP->Fit( fitPP->ffit, "IEMRNSQ");
-					mt->subtractConstTH1( htmpPP, fitPP->ffit->GetParameter(0));
+                    TH1D * htmpPP = (TH1D*) mc[0][isetup]->hDEtaRealFlip[0][iptt][ipta]->Clone(name+"tmp");
+                    MFit * fitPP = new MFit(0,0,htmpPP, -1.6, 1.6, false);
+                    htmpPP->Fit( fitPP->ffit, "IEMRNSQ");
+                    mt->subtractConstTH1( htmpPP, fitPP->ffit->GetParameter(0));
 
-					hIAAdEta[isetup][ic][iptt][ipta]->Divide(htmpPP);
+                    hIAAdEta[isetup][ic][iptt][ipta]->Divide(htmpPP);
                     hIAAdEta_newbinning[isetup][ic][iptt][ipta] = (TH1D*)mt->NewHistoWithUniqueBins(hIAAdEta[isetup][ic][iptt][ipta], newnbins-1, newxbins);
 
                     //use pp fit for IAA
-					htmpPP->Reset();
-					htmpPP->Add( mc[0][isetup]->mfit_eta_1d_ggc[0][iptt][ipta]->ffit );
-					mt->subtractConstTH1( htmpPP, mc[0][isetup]->mfit_eta_ggc[0][iptt][ipta]->ffit->GetParameter(0) );
-					htmpPP->Scale(2);
-					hIAAdEta_ppfit[isetup][ic][iptt][ipta]->Divide(htmpPP);
+                    htmpPP->Reset();
+                    htmpPP->Add( mc[0][isetup]->mfit_eta_1d_ggc[0][iptt][ipta]->ffit );
+                    mt->subtractConstTH1( htmpPP, mc[0][isetup]->mfit_eta_ggc[0][iptt][ipta]->ffit->GetParameter(0) );
+                    htmpPP->Scale(2);
+                    hIAAdEta_ppfit[isetup][ic][iptt][ipta]->Divide(htmpPP);
                     hIAAdEta_ppfit_newbinning[isetup][ic][iptt][ipta] = (TH1D*)mt->NewHistoWithUniqueBins(hIAAdEta_ppfit[isetup][ic][iptt][ipta], newnbins-1, newxbins);
 
                     //use pp from Filip for IAA
-					htmpPP->Reset();
+                    htmpPP->Reset();
                     if( ipta>=2 && iptt>=1 && PTt[1]->At(iptt) > PTa[1]->At(ipta) ) {
-						htmpPP = (TH1D*) hfilip[0]->hDEta[0][iptt-1][ipta-2]->Clone(name+"filip");
+                        htmpPP = (TH1D*) hfilip[0]->hDEta[0][iptt-1][ipta-2]->Clone(name+"filip");
                         //rebin to ours:
-						hIAAdEta_ppFilip_newbinning[isetup][ic][iptt][ipta] = (TH1D*)mt->NewHistoWithUniqueBins(hIAAdEta_ppFilip[isetup][ic][iptt][ipta], newnbins-1, newxbins);
-						TH1D * htmpPP_new =  (TH1D*)mt->NewHistoWithUniqueBins(htmpPP, newnbins-1,newxbins);
-						hIAAdEta_ppFilip_newbinning[isetup][ic][iptt][ipta]->Divide(htmpPP_new);
-						hIAAdEta_ppFilip[isetup][ic][iptt][ipta]->Divide(htmpPP);
+                        hIAAdEta_ppFilip_newbinning[isetup][ic][iptt][ipta] = (TH1D*)mt->NewHistoWithUniqueBins(hIAAdEta_ppFilip[isetup][ic][iptt][ipta], newnbins-1, newxbins);
+                        TH1D * htmpPP_new =  (TH1D*)mt->NewHistoWithUniqueBins(htmpPP, newnbins-1,newxbins);
+                        hIAAdEta_ppFilip_newbinning[isetup][ic][iptt][ipta]->Divide(htmpPP_new);
+                        hIAAdEta_ppFilip[isetup][ic][iptt][ipta]->Divide(htmpPP);
                     }
-					delete htmpAA;
-					delete htmpPP;
-					delete fitAA;
-					delete fitPP;
+                    delete htmpAA;
+                    delete htmpPP;
+                    delete fitAA;
+                    delete fitPP;
 //                    cout << "NBINS: " << ourhistos[0][isetup]->hDEtaReal[ic][iptt][ipta]->GetNbinsX() << "\t" << ourhistos[1][isetup]->hDEtaReal[ic][iptt][ipta]->GetNbinsX() << endl;
 
                 }
@@ -690,13 +690,13 @@ int main()
 
         
         int iptt_pub = PTt[0]->GetBin(8.); // always plot IAA and ICP for 8-15GeV bin
-		for(int ifit=0; ifit<kF; ifit++)
-		{
+        for(int ifit=0; ifit<kF; ifit++)
+        {
             MPlot * miaa_f_pta = new MPlot(iplot++, "p_{T, assoc} [GeV]", "I_{AA}", false);
             miaa_f_pta->SetPalette(1); // set to full symbols
             // draw IAA from with and compare with Filip's preliminary --------------------
-			hList   = { hIAA_eta[0][ifit][0][iptt_pub], hIAA_eta_INT[0][ifit][0][iptt_pub]  };
-			legList = { Form("#eta corr. |#Delta#phi|<%.1f (fit)",mc[0][0]->fPhiCut), Form("#eta corr. |#Delta#phi|<%.1f (integral)",mc[0][0]->fPhiCut)  };
+            hList   = { hIAA_eta[0][ifit][0][iptt_pub], hIAA_eta_INT[0][ifit][0][iptt_pub]  };
+            legList = { Form("#eta corr. |#Delta#phi|<%.1f (fit)",mc[0][0]->fPhiCut), Form("#eta corr. |#Delta#phi|<%.1f (integral)",mc[0][0]->fPhiCut)  };
             miaa_f_pta->addHList(hList, legList, "PE");
             miaa_f_pta->Draw();
             miaa_f_pta->AddThisEntry(gFilipIAAstat, "AN(2012) preliminary (R<0.2)");
@@ -706,57 +706,57 @@ int main()
             miaa_f_pta->Save(Form("../figs/IAA/IAA_FilipPrel_FIT%d", ifit));
         }
 
-		TH1D * hIAAFilip[5][5][5]; // histogram which
+        TH1D * hIAAFilip[5][5][5]; // histogram which
 
         for(int ic=0; ic<NumCent[1]; ic++){
             for(int iptt=minPtt; iptt<NumPtt[1]; iptt++){ 
                 for(int ipta=2; ipta<NumPta[1]; ipta++) { // start from 2-3
-					if( PTt[1]->At(iptt) <= PTa[1]->At(ipta) )
+                    if( PTt[1]->At(iptt) <= PTa[1]->At(ipta) )
                         continue;
 
-					//hIAAdEta[0][ic][iptt][ipta]->Rebin(2);hIAAdEta[0][ic][iptt][ipta]->Scale(1./2.);
+                    //hIAAdEta[0][ic][iptt][ipta]->Rebin(2);hIAAdEta[0][ic][iptt][ipta]->Scale(1./2.);
                     MPlot * miaafilip = new MPlot(++iplot, "|#Delta#eta|", "I_{AA}", true);
                     //hList = { hfilip[1]->hIAA[ic][iptt-1][ipta-2], hIAAdEta[0][ic][iptt][ipta], hIAAdEta_ppfit[0][ic][iptt][ipta], hIAAdEta_ppFilip[0][ic][iptt][ipta] };
                     //legList = {"AN(2012)", "AN(2016)", "AN(2016): pp from fit", "PbPb:AN(2016), pp:AN(2012)"};
 
 
 
-					//hIAAdEta_newbinning[0][ic][iptt][ipta]->Scale(5.);
-					//hIAAdEta_ppFilip_newbinning[0][ic][iptt][ipta]->Scale(5.);
-					//hIAAdEta_ppfit_newbinning[0][ic][iptt][ipta]->Scale(5.);
+                    //hIAAdEta_newbinning[0][ic][iptt][ipta]->Scale(5.);
+                    //hIAAdEta_ppFilip_newbinning[0][ic][iptt][ipta]->Scale(5.);
+                    //hIAAdEta_ppfit_newbinning[0][ic][iptt][ipta]->Scale(5.);
 
-					// Self-consistency check, reproduce Filip's I_AA (dEta) from correlation histos and compare to his I_AA
-					cout << ic << "\t" << iptt << "\t" << ipta << endl;
-					hIAAFilip[ic][iptt][ipta] = (TH1D*) hfilip[1]->hDEta[ic][iptt-1][ipta-2]->Clone();
-					MFit * fitAA = new MFit(0,0,hIAAFilip[ic][iptt][ipta], -1.6, 1.6, false);
-					hIAAFilip[ic][iptt][ipta]->Fit( fitAA->ffit, "EMRNSQ");
-					mt->subtractConstTH1(hIAAFilip[ic][iptt][ipta], fitAA->ffit->GetParameter(0));
+                    // Self-consistency check, reproduce Filip's I_AA (dEta) from correlation histos and compare to his I_AA
+                    cout << ic << "\t" << iptt << "\t" << ipta << endl;
+                    hIAAFilip[ic][iptt][ipta] = (TH1D*) hfilip[1]->hDEta[ic][iptt-1][ipta-2]->Clone();
+                    MFit * fitAA = new MFit(0,0,hIAAFilip[ic][iptt][ipta], -1.6, 1.6, false);
+                    hIAAFilip[ic][iptt][ipta]->Fit( fitAA->ffit, "EMRNSQ");
+                    mt->subtractConstTH1(hIAAFilip[ic][iptt][ipta], fitAA->ffit->GetParameter(0));
 
-					TH1D * htmpPP = (TH1D*) hfilip[0]->hDEta[0][iptt-1][ipta-2]->Clone();
-					MFit * fitPP = new MFit(0,0,htmpPP, -1.6, 1.6, false);
-					htmpPP->Fit( fitPP->ffit, "EMRNSQ");
-					mt->subtractConstTH1(htmpPP, fitPP->ffit->GetParameter(0));
+                    TH1D * htmpPP = (TH1D*) hfilip[0]->hDEta[0][iptt-1][ipta-2]->Clone();
+                    MFit * fitPP = new MFit(0,0,htmpPP, -1.6, 1.6, false);
+                    htmpPP->Fit( fitPP->ffit, "EMRNSQ");
+                    mt->subtractConstTH1(htmpPP, fitPP->ffit->GetParameter(0));
 
-					hIAAFilip[ic][iptt][ipta]->Divide( htmpPP );
-					// -----------------------------------------------
+                    hIAAFilip[ic][iptt][ipta]->Divide( htmpPP );
+                    // -----------------------------------------------
 
-					hList = { hfilip[1]->hIAA[ic][iptt-1][ipta-2], hIAAFilip[ic][iptt][ipta], hIAAdEta[0][ic][iptt][ipta] };
-					legList = {"AN(2012)", "AN(2012) repr.", "AN(2016)"};
+                    hList = { hfilip[1]->hIAA[ic][iptt-1][ipta-2], hIAAFilip[ic][iptt][ipta], hIAAdEta[0][ic][iptt][ipta] };
+                    legList = {"AN(2012)", "AN(2012) repr.", "AN(2016)"};
 
-					//hList = { hfilip[1]->hIAA[ic][iptt-1][ipta-2], hIAAdEta_newbinning[0][ic][iptt][ipta], hIAAdEta_ppFilip_newbinning[0][ic][iptt][ipta], hIAAdEta_ppfit_newbinning[0][ic][iptt][ipta] };
-					//legList = {"AN(2012)", "AN(2016)", "AA:(2016) PP:(2012)", "AN(2016) pp Fit"};
+                    //hList = { hfilip[1]->hIAA[ic][iptt-1][ipta-2], hIAAdEta_newbinning[0][ic][iptt][ipta], hIAAdEta_ppFilip_newbinning[0][ic][iptt][ipta], hIAAdEta_ppfit_newbinning[0][ic][iptt][ipta] };
+                    //legList = {"AN(2012)", "AN(2016)", "AA:(2016) PP:(2012)", "AN(2016) pp Fit"};
                     miaafilip->addHList(hList, legList, "pe", "p");
                     miaafilip->AddInfo( Form("Cent: %.0f-%.0f %%",Cent[1]->At(ic), Cent[1]->At(ic+1)));
                     miaafilip->AddInfo( Form("p_{Tt}#in %.0f-%.0f GeV", PTt[1]->At(iptt), PTt[1]->At(iptt+1) ) );
                     miaafilip->AddInfo( Form("p_{Ta}#in %.0f-%.0f GeV", PTa[1]->At(ipta), PTa[1]->At(ipta+1) ) );
-					miaafilip->SetLimitsXY(0, 0.28, 0.5, 2.5);
-					miaafilip->SetRatioLimitsXY(0, 0.28, 0.5, 1.5);
+                    miaafilip->SetLimitsXY(0, 0.28, 0.5, 2.5);
+                    miaafilip->SetRatioLimitsXY(0, 0.28, 0.5, 1.5);
 
 
 
                     miaafilip->Draw();
-					miaafilip->DrawThisTGraphAsymmErrors( iaafilip->gIAAsyst[ic][iptt-1][ipta-2], "E2 same", 24, 42 );
-					miaafilip->DrawThisTGraphAsymmErrors( iaafilip->gIAAstat[ic][iptt-1][ipta-2], "PE same", 24, 1 );
+                    miaafilip->DrawThisTGraphAsymmErrors( iaafilip->gIAAsyst[ic][iptt-1][ipta-2], "E2 same", 24, 42 );
+                    miaafilip->DrawThisTGraphAsymmErrors( iaafilip->gIAAstat[ic][iptt-1][ipta-2], "PE same", 24, 1 );
 
                     miaafilip->Save(Form("../figs/IAA/IAA_DEta_Filip_C0%dT0%dA0%d", ic, iptt, ipta));
 
@@ -764,18 +764,18 @@ int main()
                     MPlot * miaafilip2 = new MPlot(++iplot, "|#Delta#eta|", "I_{AA}",false);
                     //hList = {hIAAdEta[0][ic][iptt][ipta], hIAAdEta_ppfit[0][ic][iptt][ipta], hIAAdEta_ppFilip[0][ic][iptt][ipta] };
                     //legList = {"AN(2016)", "AN(2016): pp from fit", "PbPb:AN(2016), pp:AN(2012)"};
-					hList = {hIAAdEta[0][ic][iptt][ipta]};
+                    hList = {hIAAdEta[0][ic][iptt][ipta]};
                     legList = {"AN(2016)"};
                     miaafilip2->addHList(hList, legList, "pe", "p");
                     miaafilip2->AddInfo( Form("Cent: %.0f-%.0f %%",Cent[1]->At(ic), Cent[1]->At(ic+1)));
                     miaafilip2->AddInfo( Form("p_{Tt}#in %.0f-%.0f GeV", PTt[1]->At(iptt), PTt[1]->At(iptt+1) ) );
                     miaafilip2->AddInfo( Form("p_{Ta}#in %.0f-%.0f GeV", PTa[1]->At(ipta), PTa[1]->At(ipta+1) ) );
-					miaafilip2->SetLimitsXY(0, 0.28, 0.5, 2.5);
+                    miaafilip2->SetLimitsXY(0, 0.28, 0.5, 2.5);
                     miaafilip2->Draw();
-					miaafilip2->DrawThisTGraphAsymmErrors( iaafilip->gIAAsyst[ic][iptt-1][ipta-2], "E2 same", 24, 42 );
-					miaafilip2->DrawThisTGraphAsymmErrors( iaafilip->gIAAstat[ic][iptt-1][ipta-2], "PE same", 24, 1 );
-					miaafilip2->DrawThisTH1(hIAAdEta_newbinning[0][ic][iptt][ipta],"PE same",24,2);
-					miaafilip2->AddThisEntry(iaafilip->gIAAstat[ic][iptt-1][ipta-2], "AN(2012)");
+                    miaafilip2->DrawThisTGraphAsymmErrors( iaafilip->gIAAsyst[ic][iptt-1][ipta-2], "E2 same", 24, 42 );
+                    miaafilip2->DrawThisTGraphAsymmErrors( iaafilip->gIAAstat[ic][iptt-1][ipta-2], "PE same", 24, 1 );
+                    miaafilip2->DrawThisTH1(hIAAdEta_newbinning[0][ic][iptt][ipta],"PE same",24,2);
+                    miaafilip2->AddThisEntry(iaafilip->gIAAstat[ic][iptt-1][ipta-2], "AN(2012)");
                     miaafilip2->Save(Form("../figs/IAA/IAA_DEta_Filip2_C0%dT0%dA0%d", ic,iptt,ipta));
                 }
             }
@@ -785,7 +785,7 @@ int main()
 
 
 
-		return;
+        return;
 
 
 
@@ -804,53 +804,53 @@ int main()
 
         for(int itype=0; itype<2; itype++){
             for(int iptt=minPtt; iptt<NumPtt[itype]; iptt++){
-				for(int ipta=2; ipta<NumPta[itype]; ipta++)
-				{ // start from 2-3
+                for(int ipta=2; ipta<NumPta[itype]; ipta++)
+                { // start from 2-3
                     if( PTt[itype]->At(iptt) <= PTa[itype]->At(ipta) )
                         continue;
-					for(int ic=0; ic<NumCent[itype]; ic++)
-					{
-						htmp = (TH1D*)mc[itype][0]->hDEtaRealFlip[ic][iptt][ipta]->Clone(Form("htmpC%dT%dA%d",ic,iptt,ipta));
-						MFit * mfit_ours = new MFit(0,0,htmp, 0,1.4, false);
-						htmp->Fit(mfit_ours->ffit, "IEMRNSQ");
-						mt->subtractConstTH1(htmp, mfit_ours->ffit->GetParameter(0));
+                    for(int ic=0; ic<NumCent[itype]; ic++)
+                    {
+                        htmp = (TH1D*)mc[itype][0]->hDEtaRealFlip[ic][iptt][ipta]->Clone(Form("htmpC%dT%dA%d",ic,iptt,ipta));
+                        MFit * mfit_ours = new MFit(0,0,htmp, 0,1.4, false);
+                        htmp->Fit(mfit_ours->ffit, "IEMRNSQ");
+                        mt->subtractConstTH1(htmp, mfit_ours->ffit->GetParameter(0));
 
-						TH1D * htmp_new = (TH1D*)mt->NewHistoWithUniqueBins(htmp, newnbins-1, newxbins);
+                        TH1D * htmp_new = (TH1D*)mt->NewHistoWithUniqueBins(htmp, newnbins-1, newxbins);
 
                         TString name = hfilip[itype]->hDEta[ic][iptt-1][ipta-2]->GetName();
-						TH1D * htmp_filip = (TH1D*) hfilip[itype]->hDEta[ic][iptt-1][ipta-2]->Clone(name+"_resub");
+                        TH1D * htmp_filip = (TH1D*) hfilip[itype]->hDEta[ic][iptt-1][ipta-2]->Clone(name+"_resub");
                         MFit * mfit_filip = new MFit(0,0,htmp_filip, 0, 1.4, false);
-						htmp_filip->Fit(mfit_filip->ffit, "IEMRNSQ");
+                        htmp_filip->Fit(mfit_filip->ffit, "IEMRNSQ");
                         mt->subtractConstTH1( htmp_filip, mfit_filip->ffit->GetParameter(0) );
 
-						if(itype==0)
-							// normalize pp to each other
-							mt->shiftToThisTail(htmp_filip, htmp_new, 1.2, 1.6);
+                        if(itype==0)
+                            // normalize pp to each other
+                            mt->shiftToThisTail(htmp_filip, htmp_new, 1.2, 1.6);
 
-						//htmp_filip->Scale(1., "width");
-						//double scaleCorr = mc[itype][0]->fFilipCorr_eta[ic][iptt][ipta] ;
-						//htmp->Scale( scaleCorr );
-						//cout << "scaling " << Types[itype] << "\t" << scaleCorr << endl;
-						//htmp_new->Scale( scaleCorr );
-						//htmp_new->Scale(1./2.);
+                        //htmp_filip->Scale(1., "width");
+                        //double scaleCorr = mc[itype][0]->fFilipCorr_eta[ic][iptt][ipta] ;
+                        //htmp->Scale( scaleCorr );
+                        //cout << "scaling " << Types[itype] << "\t" << scaleCorr << endl;
+                        //htmp_new->Scale( scaleCorr );
+                        //htmp_new->Scale(1./2.);
 
                         MPlot * mdetafilip = new MPlot(++iplot, "|#Delta#eta|", "1/N_{trigg.}dN/d|#Delta#eta|", true);
-						//hList = { hfilip[itype]->hDEta[ic][iptt-1][ipta-2], htmp_new };
-						hList = { htmp_filip, htmp_new };
+                        //hList = { hfilip[itype]->hDEta[ic][iptt-1][ipta-2], htmp_new };
+                        hList = { htmp_filip, htmp_new };
                         legList = {"AN(2012)",  "AN(2016)"};
 
                         mdetafilip->addHList(hList, legList, "PE", "p");
-						mdetafilip->SetLimitsX(0, 1.4);
+                        mdetafilip->SetLimitsX(0, 1.4);
                         if(itype>0) mdetafilip->AddInfo( Form("Cent: %.0f-%.0f %%",Cent[1]->At(ic), Cent[1]->At(ic+1)));
                         mdetafilip->AddInfo( Form("p_{Tt}#in %.0f-%.0f GeV", PTt[1]->At(iptt), PTt[1]->At(iptt+1) ) );
                         mdetafilip->AddInfo( Form("p_{Ta}#in %.0f-%.0f GeV", PTa[1]->At(ipta), PTa[1]->At(ipta+1) ) );
-						mdetafilip->SetRatioLimitsXY(0, 1.4, 0.0, 2.0);
+                        mdetafilip->SetRatioLimitsXY(0, 1.4, 0.0, 2.0);
                         mdetafilip->Draw();
                         mdetafilip->DrawThisTF1(mfit_filip->ffit, "same");
                         mdetafilip->Save(Form("../figs/Corr/DEta_Filip_%s_C0%dT0%dA0%d", Types[itype].Data(),ic,iptt,ipta));
 
-						delete mfit_filip;
-						delete mfit_ours;
+                        delete mfit_filip;
+                        delete mfit_ours;
                     }
                 }
             }
@@ -860,11 +860,11 @@ int main()
                 if( PTt[1]->At(iptt) <= PTa[1]->At(ipta) )
                     continue;
 
-				TH1D * htmp_pp = (TH1D*)mc[0][0]->hDEtaRealFlip[0][iptt][ipta]->Clone();
-				mt->subtractConstTH1( htmp_pp, 2 * mc[0][0]->mfit_eta_ggc[0][iptt][ipta]->ffit->GetParameter(0) );
+                TH1D * htmp_pp = (TH1D*)mc[0][0]->hDEtaRealFlip[0][iptt][ipta]->Clone();
+                mt->subtractConstTH1( htmp_pp, 2 * mc[0][0]->mfit_eta_ggc[0][iptt][ipta]->ffit->GetParameter(0) );
 
-				for(int ic=0; ic<NumCent[1]; ic++)
-				{
+                for(int ic=0; ic<NumCent[1]; ic++)
+                {
                     TH1D * htmp_AA = (TH1D*)mc[1][0]->hDEtaRealFlip[ic][iptt][ipta]->Clone();
                     mt->subtractConstTH1( htmp_AA, 2 * mc[1][0]->mfit_eta_ggc[ic][iptt][ipta]->ffit->GetParameter(0) );
 
@@ -960,18 +960,18 @@ return;
 
         cout << "end the fucking width_cent\n";
 
-	}
+    }
 
 
 
-	*/
+    */
 
 
 
 
 
 
-	/*
+    /*
     cout << "Yield (dEta): ours vs. Filip" << endl;
     for(int itype=0; itype<2; itype++){
         for(int isetup=0; isetup<NSetup[itype]; isetup++){
@@ -1033,8 +1033,8 @@ return;
             if( PTtBo[iptt] <= PTaBo[ipta] ) 
                 continue;
             for(int ic=1; ic<5; ic++){
-				for(int isetup=0; isetup<NSetup[1]; isetup++)
-				{
+                for(int isetup=0; isetup<NSetup[1]; isetup++)
+                {
                     hDEtaRealFlip[1][isetup][ic][iptt][ipta]->Divide( hDEtaRealFlip[0][isetup][0][iptt][ipta] );
                     hDEtaRawFlip[1][isetup][ic][iptt][ipta]->Divide( hDEtaRawFlip[0][isetup][0][iptt][ipta] );
                 }
@@ -1079,7 +1079,7 @@ return;
             miaa_filip->Save(Form("../figs/PubYield/IAA_DEta_FilipVSFilip_C0%dT0%dA0%d", 0, iptt, ipta));
         }
     }
-	*/
+    */
 
 
 
@@ -1087,7 +1087,7 @@ return;
         // Compare original + 2D method's projection
         // -------------------------------------
 
-	/*
+    /*
         int etaMinBin, etaMaxBin, phiMinBin, phiMaxBin;
 
         TString histname;
@@ -1104,19 +1104,19 @@ return;
                         
                         histname = mc[itype][0]->hDEtaDPhiReal[ic][iptt][ipta]->GetName();
                         
-						he = (TH1D*) mc[itype][0]->hDEtaDPhiReal[ic][iptt][ipta]->ProjectionX( Form("%s_eta",histname.Data()), phiMinBin, phiMaxBin );
-						hp = (TH1D*) mc[itype][0]->hDEtaDPhiReal[ic][iptt][ipta]->ProjectionY( Form("%s_phi",histname.Data()), etaMinBin, etaMaxBin );
-						//he->Print();
-						//hp->Print();
-						//he->Scale(1./(phiMaxBin-phiMinBin));
-						//hp->Scale(2.*TMath::Pi()/(etaMaxBin-etaMinBin), "width");
+                        he = (TH1D*) mc[itype][0]->hDEtaDPhiReal[ic][iptt][ipta]->ProjectionX( Form("%s_eta",histname.Data()), phiMinBin, phiMaxBin );
+                        hp = (TH1D*) mc[itype][0]->hDEtaDPhiReal[ic][iptt][ipta]->ProjectionY( Form("%s_phi",histname.Data()), etaMinBin, etaMaxBin );
+                        //he->Print();
+                        //hp->Print();
+                        //he->Scale(1./(phiMaxBin-phiMinBin));
+                        //hp->Scale(2.*TMath::Pi()/(etaMaxBin-etaMinBin), "width");
 
-						//he->Scale(0.02);
-						//hp->Scale(27);
+                        //he->Scale(0.02);
+                        //hp->Scale(27);
 
-						//he->Scale( 0.3 );
-						//hp = (TH1D*) mt->shrinkHist( hp, TMath::Pi() );
-						//hp->Scale( 0.6, "width" );
+                        //he->Scale( 0.3 );
+                        //hp = (TH1D*) mt->shrinkHist( hp, TMath::Pi() );
+                        //hp->Scale( 0.6, "width" );
                         
                         MPlot * meta_c = new MPlot(iplot++, "#Delta#eta", "1/N_{trigg.}dN/d#Delta#eta", true);
                         hList   = { he, mc[itype][0]->hDEtaReal[ic][iptt][ipta] };
@@ -1134,7 +1134,7 @@ return;
                         legList = { "2D correction", "1D correction" }; 
 
                         mphi_c->AddInfo(  mc[itype][0]->BuildInfo() );
-						if(itype==1) mphi_c->AddInfo( Form("Cent: %.0f-%.0f %%",Cent[1]->At(ic), Cent[1]->At(ic+1)));
+                        if(itype==1) mphi_c->AddInfo( Form("Cent: %.0f-%.0f %%",Cent[1]->At(ic), Cent[1]->At(ic+1)));
                         mphi_c->AddInfo( Form("p_{Tt}#in %.0f-%.0f GeV", PTt[1]->At(iptt), PTt[1]->At(iptt+1) ) );
                         mphi_c->AddInfo( Form("p_{Ta}#in %.0f-%.0f GeV", PTa[1]->At(ipta), PTa[1]->At(ipta+1) ) );
 
@@ -1146,7 +1146,7 @@ return;
                     }
                 }
             }
-		}
-	*/
+        }
+    */
 }
 

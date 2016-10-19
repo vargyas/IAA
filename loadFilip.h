@@ -48,19 +48,19 @@ class FilipHistos
 
 
 
-			// Common bins:
-			const double pttBorders[] = {4, 6, 8, 15};
-			const double ptaBorders[] = {2, 3, 4, 6, 8};
-			const double centBorders[]= {0, 10, 20, 40, 60, 90};
-			const int numCent = 5;
-			const int numPtt  = 3;
-			const int numPta  = 4;
+            // Common bins:
+            const double pttBorders[] = {4, 6, 8, 15};
+            const double ptaBorders[] = {2, 3, 4, 6, 8};
+            const double centBorders[]= {0, 10, 20, 40, 60, 90};
+            const int numCent = 5;
+            const int numPtt  = 3;
+            const int numPta  = 4;
 
-			// PP bins:
-			const double vertBorters[] = {-10, -5, 0, 5, 10};
-			const double phiBorders[]  = {0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6};
-			const int numVert = 4;
-			const int numPhi  = 8;
+            // PP bins:
+            const double vertBorters[] = {-10, -5, 0, 5, 10};
+            const double phiBorders[]  = {0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6};
+            const int numVert = 4;
+            const int numPhi  = 8;
 
 
 

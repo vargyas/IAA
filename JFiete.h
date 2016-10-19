@@ -85,25 +85,25 @@ class JFieteCF {
                 if( c0  < 10 ) { iCent=0; }
                 if( c0 > 50 ){ iCent = 2; }
             }
-			cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
+            cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
 
             if( iCent < 0 ) return 0x0;
             for( int i=0;i<NPttBinPiete;i++ ){
                 if( ptt0 < PttBinPiete[i+1]-1e-4 ) {
-					iPtt = i;continue;
+                    iPtt = i;continue;
                 }
             }
-			cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
-			if( iPtt < 0 ) return 0x0;
+            cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
+            if( iPtt < 0 ) return 0x0;
             for( int i=0;i<NPtaBinPiete;i++ ){
                 if( pta0 < PtaBinPiete[i+1]-1e-4 ) {
                     iPta = i;break;
                 }
             }
             if( iPta < 0 ) return 0x0;
-			cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
-			 fDeta1D[iPtt][iPta][iCent]->Print();
-			return fDeta1D[iPtt][iPta][iCent];
+            cout << iCent << "\t" << iPtt << "\t" << iPta << endl;
+             fDeta1D[iPtt][iPta][iCent]->Print();
+            return fDeta1D[iPtt][iPta][iCent];
         }
 
 };
