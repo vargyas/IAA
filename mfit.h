@@ -509,19 +509,18 @@ public:
         {
             case kOneGenGaussConst : width = GetWidthOneGenGauss(); break; // 0
             case kOneGenGaussFlow  : width = GetWidthOneGenGauss(); break; // 1
+            case kTwoGenGaussConst : width = GetWidthTwoGenGauss(); break;
             default: width = -1;
         }
         return width;
     }
     double GetWidthError(TFitResultPtr ptr)
     {
-        double widtherr = -1;
+        double widtherr = 0;
         switch( fFuncType )
         {
             case kOneGenGaussConst : widtherr = GetWidthErrorOneGenGauss(ptr); break; // 0
             case kOneGenGaussFlow  : widtherr = GetWidthErrorOneGenGauss(ptr); break; // 1
-            default: widtherr = -1;
-
         }
         return widtherr;
     }
@@ -530,6 +529,16 @@ public:
         double beta  = ffit->GetParameter(3);
         return alpha*sqrt( TMath::Gamma(3./beta)/ TMath::Gamma(1./beta) );
     }
+    double GetWidthTwoGenGauss() {
+        double alpha[2]; double beta[2]; double sigma[2];
+        for(int i=0;i<2;i++){
+            alpha[i] = ffit->GetParameter(3+i*3);
+            beta[i]  = ffit->GetParameter(4+i*3);
+            sigma[i] = alpha[i]*sqrt( TMath::Gamma(3./beta[i])/ TMath::Gamma(1./beta[i]) );
+        }
+        return 1./2.*TMath::Sqrt(sigma[0]*sigma[0]+sigma[1]*sigma[1]);
+    }
+
     double GetWidthErrorOneGenGauss( TFitResultPtr ptr )
     {
         TMatrixDSym cov = ptr->GetCovarianceMatrix();
