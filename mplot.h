@@ -150,12 +150,17 @@ class MPlot
             Initialize(index, xlab, ylab, sp);
             fMarkers = Markers_open; //open default, set later with SetPalette
         }
-        virtual ~MPlot(){
-            if (fCanvas) delete fCanvas;
-            if (fPad) delete fPad;
-            if (fPadRatio) delete fPadRatio;
-            if (histList) delete histList;
-            if (histRatioList) delete histRatioList;
+        ~MPlot(){
+            delete fCanvas;
+            delete fHfr;
+            if(isSplit) delete fHfr_ratio;
+            //delete fPad;
+            //delete histList;
+            //if(isSplit)
+            //{
+            //    delete fPadRatio;
+            //    delete histRatioList;
+            //}
         }
 
         /*
@@ -206,7 +211,7 @@ class MPlot
             fCanvas = new TCanvas(cname, cname, 440, 440); // should be formatted here
             fPad = new TPad(pname, pname, 0.01, 0.01, 0.99, 0.99, 0,0,0);
             SetPadRange(fPad, fMarginLeft, fMarginRight, fMarginTop, fMarginBottom);
-            fHfr = new TH2F(Form("hfr%d", fNameIndex), "tit", 800, -1, 1, 800, 0, 1000);
+            fHfr = new TH2F(Form("hfr%d", fNameIndex), "tit", 10, -1, 1, 10, 0, 1000);
             SetHfrStyle( fHfr, fXTitle, fYTitle, 1);
         }
 
@@ -260,7 +265,6 @@ class MPlot
             hranges.push_back( get_max(xmax) );
             hranges.push_back( get_min(ymin) );
             hranges.push_back( get_max(ymax) );
-
             return hranges;
         }
 
@@ -271,6 +275,7 @@ class MPlot
         {
             std::vector<double> y, yranges;
             int N = hList->GetEntries();
+            y.reserve(N);
             for(int ihist=0; ihist<N; ihist++)
             {
                 int ixmin = ((TH1*)(hList->At(ihist)))->FindBin(xmin);
@@ -441,30 +446,30 @@ class MPlot
             SetHfrRange( fHfr, histList, "", ymin, ymax, xmin, xmax, "");
             if(isSplit) SetHfrRange( fHfr_ratio, histRatioList, "auto", 0, 1, xmin, xmax, "");
         }
+        /*
+         * The y range is usually automatic
+         */
         void SetHfrRange( TH1*h, TObjArray * hList, TString auto_y, double ymin=0, double ymax=1,double xmin=0, double xmax=1, TString auto_x="auto"){
-           if( auto_x == "auto"){
-               std::vector<double> ranges;
-               ranges = GetHRanges(hList);
-               double xmin = ranges[0]; double xmax = ranges[1];
-               h->GetXaxis()->SetLimits( xmin, xmax );
-               h->GetYaxis()->SetLimits( ymin, ymax );
+            // determine xrange first:
+            if( auto_x == "auto"){
+                std::vector<double> ranges;
+                ranges = GetHRanges(hList);
+                xmin = ranges[0];
+                xmax = ranges[1];
             }
-           if( auto_y == "auto"){
-               std::vector<double> ranges;
-               ranges = GetYRanges(hList, xmin, xmax);
-               double yw_low=0.1; double yw_high=0.2;
+            // determine yrange:
+            if( auto_y == "auto"){
+                std::vector<double> ranges;
+                ranges = GetYRanges(hList, xmin, xmax);
+                double yw_low=0.1; double yw_high=0.2;
 
-               double height = ranges[1]-ranges[0];
-               double ymin = ranges[0]-height*yw_low;
-               double ymax = ranges[1]+height*yw_high; 
-               h->GetYaxis()->SetLimits( ymin, ymax );
+                double height = ranges[1]-ranges[0];
+                ymin = ranges[0]-height*yw_low;
+                ymax = ranges[1]+height*yw_high;
             }
-            if( auto_x!="auto"){
-               h->GetXaxis()->SetLimits( xmin, xmax );
-            }
-            if( auto_y!="auto"){
-               h->GetYaxis()->SetLimits( ymin, ymax );
-            }
+
+            h->GetXaxis()->SetLimits( xmin, xmax );
+            h->GetYaxis()->SetLimits( ymin, ymax );
         }
         void SetPadRange(TPad * pad, double r1, double r2, double r3, double r4) {
             pad->SetLeftMargin(r1); pad->SetRightMargin(r2);
@@ -488,19 +493,28 @@ class MPlot
             if(isSplit) fPadRatio->SetGrid(1, 1);
         }
 
-        void SetHfrStyle( TH1 * histo, TString xtit, TString ytit, float ratio ){
+        void SetHfrStyle( TH1 * histo, TString xtit, TString ytit, float ratio, bool iscustombinX=false ){
             double fTitleOffsetX = 1.1;    // Offset of the x-axis title
             double fTitleOffsetY = 1.1;    // Offset of the y-axis title
             double fTitleSizeX = 0.06;     // Size of the x-axis title
             double fTitleSizeY = 0.06;     // Size of the y-axis title
             double fLabelOffsetX = 0.01;   // Offset of the x-axis label
             double fLabelOffsetY = 0.001;  // Offset of the y-axis label
-            double fLabelSizeX = 0.04;     // Size of the x-axis label
-            double fLabelSizeY = 0.04;     // Size of the y-axis label
-            int fDivisionsX = 505;      // The number of divisions in x-axis
+            int fDivisionsX;               // The number of divisions in x-axis
             int fDivisionsY = 505;      // The number of divisions in y-axis
             int fFont = 42;             // Font index for titles and labels
-            
+            double fLabelSizeX;            // Size of the x-axis label
+            double fLabelSizeY = 0.04;     // Size of the y-axis label
+
+            if(iscustombinX) {
+                fLabelSizeX = 0.05;
+                fDivisionsX = 0;
+            }
+            else  {
+                fLabelSizeX = 0.04;
+                fDivisionsX = 505;
+            }
+
             histo->GetXaxis()->CenterTitle(1);    // Axis titles are centered
             histo->GetYaxis()->CenterTitle(1);    // Axis titles are centered
 
@@ -535,6 +549,22 @@ class MPlot
                 std::cout << "List of ratio histograms:" << std::endl;
                 for(Int_t i=0; i<histRatioList->GetEntriesFast(); i++) histRatioList->At(i)->Print() ;
             }
+        }
+
+        void CopyBinLabelsX(TH1D * h)
+        {
+            delete fHfr;
+            const int nbins = h->GetNbinsX();
+            double * xbins = new double[nbins+1];
+            for(int ib=1;ib<=nbins+1;ib++){
+                xbins[ib-1] = h->GetBinLowEdge(ib);
+            }
+            fHfr = new TH2F(Form("hfr%d", fNameIndex), "tit",nbins, xbins, 10, 0, 1000);
+            for(int ib=1;ib<=nbins;ib++) fHfr->GetXaxis()->SetBinLabel(ib, h->GetXaxis()->GetBinLabel(ib));
+            delete xbins;
+            fHfr->LabelsOption("d","x");
+            SetHfrRange( fHfr, histList, "auto" );
+            SetHfrStyle( fHfr, fXTitle, fYTitle, 1, true);
         }
 
         void Reset(){
