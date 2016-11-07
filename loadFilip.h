@@ -10,7 +10,7 @@
 
 
 // Flips histogram around 0, creates a new with half the bins
-TH1D *Flip(TH1D* hin){
+/*TH1D *Flip(TH1D* hin){
     int nb  = hin->GetNbinsX();
     double max = hin->GetBinLowEdge(nb+1);
     TString hname = hin->GetName();
@@ -29,7 +29,10 @@ TH1D *Flip(TH1D* hin){
     }
     return hout;
 }
+*/
 // ----------------------------------------------------------
+
+#include "mtools.h"
 
 
 class FilipHistos
@@ -38,16 +41,16 @@ class FilipHistos
         TString fCollType;
         TFile * infile;
         TString inName;
-        TH1D * htmp, * htmp_pp;
+        TH1D * htmp;
+        // turns out pp is not mixed event corrected!
+        TH1D * htmp_pp, * htmp_pp_mix;
 
     public:
         TH1D * hIAA[5][10][10]; 
         TH1D * hDEta[5][10][10]; // flipped histos
 
-        FilipHistos(TString type){
-
-
-
+        FilipHistos(TString type)
+        {
             // Common bins:
             const double pttBorders[] = {4, 6, 8, 15};
             const double ptaBorders[] = {2, 3, 4, 6, 8};
@@ -62,10 +65,10 @@ class FilipHistos
             const int numVert = 4;
             const int numPhi  = 8;
 
-
-
             cout << "Filip histos being initialized for [" << type << "]" << endl;
             fCollType = type;
+
+            MTools mt = MTools();
 
             // processing Pb+Pb if chosen
             if(fCollType=="AA" or fCollType=="PbPb"){
@@ -93,7 +96,6 @@ class FilipHistos
                 infile = TFile::Open(inName);
                 TH1D * htrigg[10];
 
-
                 for(int iptt=0; iptt<numPtt; iptt++){
                     htrigg[iptt] = (TH1D*) infile->Get(Form("hTriggPtBin000%d0%d",0,iptt));
                     htrigg[iptt]->Reset();
@@ -108,13 +110,22 @@ class FilipHistos
 
                         htmp_pp = (TH1D*)infile->Get(Form("hDEtaNear00000%d0%d0%d0%d", 0, 0, iptt,ipta));
                         htmp_pp->Reset();
+                        htmp_pp_mix = (TH1D*)infile->Get(Form("hDEtaNear01000%d0%d0%d0%d", 0, 0, iptt,ipta));
+                        htmp_pp_mix->Reset();
+
                         for(int iv=0; iv<numVert; iv++){
                             for(int iphi=0; iphi<numPhi; iphi++){
                                 htmp = (TH1D*)infile->Get(Form("hDEtaNear00000%d0%d0%d0%d", iv, iphi, iptt,ipta));
                                 htmp_pp->Add( htmp );
+                                htmp = (TH1D*)infile->Get(Form("hDEtaNear01000%d0%d0%d0%d", iv, iphi, iptt,ipta));
+                                htmp_pp_mix->Add( htmp );
                             }
                         }
-                        hDEta[0][iptt][ipta] = Flip( htmp_pp );
+                        htmp_pp_mix->Scale(1./mt.GetMixedNorm1D(htmp_pp_mix));
+                        htmp_pp->Divide(htmp_pp_mix);
+                        // and background is not yet removed from signal
+                        mt.subtractConstTH1(htmp_pp);
+                        hDEta[0][iptt][ipta] = mt.Flip( htmp_pp );
                         hDEta[0][iptt][ipta]->Scale( 1./htrigg[iptt]->Integral(), "width" );
                         hDEta[0][iptt][ipta]->Rebin(4); hDEta[0][iptt][ipta]->Scale(1./4.);
                     }

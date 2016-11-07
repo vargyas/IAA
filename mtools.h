@@ -4,6 +4,7 @@
 #include <TPad.h>
 #include <TROOT.h>
 #include "mfit.h"
+#include "mplot.h"
 
 /* 
  * ***************************************************************************
@@ -24,10 +25,84 @@ private:
 public:
     MTools() { mToolsIndex=0; }
 
+
+
+
+    double GetMixedNorm1D(TH1D * hmix)
+    // Average over mixed event's 2 bins around (0)
+    // (instead of using value at (0) )
+    {
+        double scaleMix = 0;
+        double eps = 0.001;
+        Int_t scaleMixBins[2];
+        scaleMixBins[0] = hmix->FindBin(eps);
+        scaleMixBins[1] = hmix->FindBin(-1.*eps);
+
+        for(Int_t ib=0; ib<2; ib++)
+            scaleMix += hmix->GetBinContent( scaleMixBins[ib] );
+
+        return scaleMix/2.;
+    }
+
+    double GetMixedNorm2D(TH2D * hmix)
+    // Average over mixed event's 4 bins around (0,0)
+    // (instead of using value at (0,0) )
+    {
+        double scaleMix = 0;
+        double eps = 0.001;
+        Int_t scaleMixBins[4];
+        scaleMixBins[0] = hmix->FindBin(eps, eps);
+        scaleMixBins[1] = hmix->FindBin(eps, -1.*eps);
+        scaleMixBins[2] = hmix->FindBin(-1.*eps, eps);
+        scaleMixBins[3] = hmix->FindBin(-1.*eps, -1.*eps);
+
+        for(Int_t ib=0; ib<4; ib++)
+            scaleMix += hmix->GetBinContent( scaleMixBins[ib] );
+
+        return scaleMix/4.;
+    }
+
+
+    // --------------------------------------------
+    // Makes absolute error histogram of a given histogram
+    // --------------------------------------------
+    TH1 * CreateErrHist( TH1 * h )
+    {
+        TH1 * hnew = (TH1*)h->Clone(Form("%s_err",h->GetName()));
+        hnew->Reset();
+        double err = 0;
+        for(int ib=1; ib<h->GetNbinsX(); ib++)
+        {
+            err = h->GetBinError(ib);
+            if( err!=err ) hnew->SetBinContent(ib, 0);
+            else hnew->SetBinContent(ib, h->GetBinError(ib));
+            hnew->SetBinError(ib,0);
+        }
+        return hnew;
+    }
+    // --------------------------------------------
+    // Makes relative error histogram of a given histogram
+    // --------------------------------------------
+    TH1 * CreateRelErrHist( TH1 * h )
+    {
+        TH1 * hnew = (TH1*)h->Clone(Form("%s_err",h->GetName()));
+        hnew->Reset();
+        double err = 0;
+        for(int ib=1; ib<h->GetNbinsX(); ib++)
+        {
+            err = h->GetBinError(ib)/h->GetBinContent(ib);
+            // handle nan values
+            if( err!=err ) hnew->SetBinContent(ib, 0);
+            else hnew->SetBinContent(ib, err );
+            hnew->SetBinError(ib, 0);
+        }
+        return hnew;
+    }
     // --------------------------------------------
     // Shrinks x axis of a histogram (h) with (sc)
     // --------------------------------------------
-    TH1 * shrinkHist( TH1 * h, double sc){
+    TH1 * shrinkHist( TH1 * h, double sc)
+    {
         int nbins   = h->GetNbinsX();
         double xmin = h->GetXaxis()->GetXmin()/sc;
         double xmax = h->GetXaxis()->GetXmax()/sc;
@@ -60,7 +135,8 @@ public:
     void subtractConstTH1(TH1 * h, double bg)
     {
         double y, yerr;
-        for(int ib=1; ib<=h->GetNbinsX(); ib++){
+        for(int ib=1; ib<=h->GetNbinsX(); ib++)
+        {
             y = h->GetBinContent(ib)-bg;
             yerr = h->GetBinError(ib)/h->GetBinContent(ib);
 
@@ -82,18 +158,32 @@ public:
             val = h->GetBinContent(ib);
             err = h->GetBinError(ib);
             hsig->SetBinContent(ib,val-bg);
-            adderror ? hsig->SetBinError(ib,(val)*sqrt(err/val*err/val + ebg*ebg/bg/bg)) : hsig->SetBinError(ib,(val)*err/val);
+            adderror ? hsig->SetBinError(ib,(val-bg)*sqrt(err*err/val/val + ebg*ebg/bg/bg)) : hsig->SetBinError(ib, err);
         }
         return hsig;
     }
+    TH1D * subtractConstTH1(TH1 * h, TF1 * fit)
+    {
+        int nb =h->GetNbinsX();
+        TString hname = h->GetName();
+        TH1D *hsig  = (TH1D*) h->Clone(Form("%s_sig",hname.Data()));
+        //hsig->Sumw2();
+        TH1D *htmp  = (TH1D*) h->Clone(Form("%s_sig_tmp",hname.Data()));
+        for(int ib=1; ib<=nb; ib++){
+            htmp->SetBinContent(ib,fit->GetParameter(0));
+            htmp->SetBinError(ib, fit->GetParError(0));
+        }
+        hsig->Add(htmp, -1.0);
+        return hsig;
+    }
+
     void subtractConstTH1(TH1 * h) // fit and subtract constant from deta histogram
     {
-        MFit * fit = new MFit(0, 0, h, 0, 1.6, false); // larger range for better backg. estimation
-        h->Fit( fit->ffit, "IEMR");
+        MFit * fit = new MFit(0, 0, h, 0.0, 1.6, false); // larger range for better backg. estimation
+        h->Fit( fit->ffit, "EMR");
         double bg = fit->ffit->GetParameter(0);
-        double bgerr = fit->ffit->GetParError(0);
+        //double bgerr = fit->ffit->GetParError(0);
         subtractConstTH1(h, bg);
-        //return h;
         delete fit;
     }
 
@@ -150,7 +240,7 @@ public:
         double max = hin->GetBinLowEdge(nb+1);
         double valPos, valNeg, errPos, errNeg, err;
         TString hname = hin->GetName();
-        TString newName = Form("%s_flip_%d",hname.Data(), ++mToolsIndex);
+        TString newName = Form("%s_flip_%d",hname.Data(), mToolsIndex++);
 
         TH1D * hout = new TH1D(newName.Data(), newName.Data(), (int) nb/2, 0, max);
 

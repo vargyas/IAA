@@ -42,8 +42,8 @@ add_library(${MODULE} SHARED   G__${MODULE}.cxx)
 # Linking the library
 target_link_libraries(${MODULE} ${ROOT_LIBRARIES})
 
-add_executable(process processDraw.cxx)
-target_link_libraries(process ${MODULE}) 
+add_executable(iaa processDraw.cxx)
+target_link_libraries(iaa ${MODULE})
 
 
 

@@ -521,41 +521,67 @@ public:
         {
             case kOneGenGaussConst : widtherr = GetWidthErrorOneGenGauss(ptr); break; // 0
             case kOneGenGaussFlow  : widtherr = GetWidthErrorOneGenGauss(ptr); break; // 1
+            case kTwoGenGaussConst : widtherr = GetWidthErrorTwoGenGauss(ptr); break;
         }
         return widtherr;
     }
     double GetWidthOneGenGauss() {
-        double alpha = ffit->GetParameter(2);
-        double beta  = ffit->GetParameter(3);
-        return alpha*sqrt( TMath::Gamma(3./beta)/ TMath::Gamma(1./beta) );
+        double width=-1;
+        if(fIsGauss) {
+            width = ffit->GetParameter(2) / TMath::Sqrt2();
+        }
+        else {
+            double alpha = ffit->GetParameter(2);
+            double beta  = ffit->GetParameter(3);
+            width = alpha*sqrt( TMath::Gamma(3./beta)/ TMath::Gamma(1./beta) );
+        }
+        return width;
     }
     double GetWidthTwoGenGauss() {
-        double alpha[2]; double beta[2]; double sigma[2];
-        for(int i=0;i<2;i++){
-            alpha[i] = ffit->GetParameter(3+i*3);
-            beta[i]  = ffit->GetParameter(4+i*3);
-            sigma[i] = alpha[i]*sqrt( TMath::Gamma(3./beta[i])/ TMath::Gamma(1./beta[i]) );
+        double alpha[2]; double beta[2]; double sigma[2]; double yield[2];
+
+        for(int i=0;i<2;i++)
+        {
+            yield[i] = ffit->GetParameter(1+i*3);
+            alpha[i] = ffit->GetParameter(2+i*3);
+            beta[i]  = ffit->GetParameter(3+i*3);
+            if(fIsGauss)
+                sigma[i] = alpha[i]*sqrt( TMath::Gamma(3./beta[i])/ TMath::Gamma(1./beta[i]) );
+            else
+                sigma[i] = alpha[i] / TMath::Sqrt2();
         }
-        return 1./2.*TMath::Sqrt(sigma[0]*sigma[0]+sigma[1]*sigma[1]);
+        // merging widths weighted by the yield
+        double width = TMath::Sqrt(yield[0]*sigma[0]*sigma[0]+yield[1]*sigma[1]*sigma[1])/(yield[0]+yield[1]);
+        return width;
     }
 
-    double GetWidthErrorOneGenGauss( TFitResultPtr ptr )
+    double GetWidthErrorOneGenGauss( TFitResultPtr ptr, int alphaParIndex=2, int betaParIndex=3 )
     {
-        TMatrixDSym cov = ptr->GetCovarianceMatrix();
+        if(fIsGauss) {
+            return ffit->GetParError(alphaParIndex) / TMath::Sqrt2();
+        }
+        else {
+            TMatrixDSym cov = ptr->GetCovarianceMatrix();
 
-        double alpha = ffit->GetParameter(2);
-        double beta  = ffit->GetParameter(3);
+            double alpha = ffit->GetParameter(alphaParIndex);
+            double beta  = ffit->GetParameter(betaParIndex);
 
-        double alphaDer = TMath::Sqrt(TMath::Gamma(3./beta)/TMath::Gamma(1./beta));
-        TF1* tmp = new TF1("tmp","TMath::Sqrt(TMath::Gamma(3./x)/TMath::Gamma(1./x))",1,2);
-        double betaDer = alpha*tmp->Derivative(beta);
-        double rmsError =
-            TMath::Power(alphaDer * ffit->GetParError(2), 2) +
-            TMath::Power(betaDer * ffit->GetParError(3), 2) +
-            2. * alphaDer * betaDer * cov(2, 3);
-        return TMath::Sqrt(rmsError);
+            double alphaDer = TMath::Sqrt(TMath::Gamma(3./beta)/TMath::Gamma(1./beta));
+            TF1 tmp = TF1("tmp","TMath::Sqrt(TMath::Gamma(3./x)/TMath::Gamma(1./x))",1,2);
+            double betaDer = alpha*tmp.Derivative(beta);
+            double rmsError =
+                TMath::Power(alphaDer * ffit->GetParError(alphaParIndex), 2) +
+                TMath::Power(betaDer * ffit->GetParError(betaParIndex), 2) +
+                2. * alphaDer * betaDer * cov(alphaParIndex, betaParIndex);
+            return TMath::Sqrt(rmsError);
+        }
     }
-
+    double GetWidthErrorTwoGenGauss( TFitResultPtr ptr, int alphaParIndex_1=2, int betaParIndex_1=3,int alphaParIndex_2=5, int betaParIndex_2=6 )
+    {
+        double rmsError_1 = GetWidthErrorOneGenGauss(ptr, alphaParIndex_1, betaParIndex_1);
+        double rmsError_2 = GetWidthErrorOneGenGauss(ptr, alphaParIndex_2, betaParIndex_2);
+        return TMath::Sqrt(rmsError_1*rmsError_1 + rmsError_2*rmsError_2);
+    }
 
     /*
      * Drawing for the different cases (all formatting is done here)

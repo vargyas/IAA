@@ -41,7 +41,6 @@ public:
         // extracted by MCorr for various fits 
         // and back. subtraction
         // -------------------------------------
-
         TString name = "";
         for(int ifit=0; ifit<kF; ifit++)
         {
@@ -49,41 +48,29 @@ public:
             {
                 for(int iptt=fPP->fMinPTtBin; iptt<fPP->fNumPtt; iptt++)
                 {
-                    name = Form("hYield_eta_1D_F%d_C%dT%d",ifit,ic,iptt);
+                    name = Form("hYield_eta_pta_PbPb_1D_F%d_C%dT%d",ifit,ic,iptt);
                     hIAA_eta_1d[ifit][ic][iptt] = (TH1D*)((TH1D*)fAA->FitResultsEta->FindObject(name))->Clone();
-                    name = Form("hYield_eta_1D_F%d_C%dT%d",ifit,0,iptt);
+                    name = Form("hYield_eta_pta_pp_1D_F%d_C%dT%d",ifit,0,iptt);
                     hIAA_eta_1d[ifit][ic][iptt]->Divide( (TH1D*)fPP->FitResultsEta->FindObject(name) );
 
-                    name = Form("hYield_eta_2D_F%d_C%dT%d",ifit,ic,iptt);
+                    name = Form("hYield_eta_pta_PbPb_2D_F%d_C%dT%d",ifit,ic,iptt);
                     hIAA_eta_2d[ifit][ic][iptt] = (TH1D*)((TH1D*)fAA->FitResultsEta->FindObject(name))->Clone();
-                    name = Form("hYield_eta_2D_F%d_C%dT%d",ifit,0,iptt);
+                    name = Form("hYield_eta_pta_pp_2D_F%d_C%dT%d",ifit,0,iptt);
                     hIAA_eta_2d[ifit][ic][iptt]->Divide( (TH1D*)fPP->FitResultsEta->FindObject(name) );
 
-                    name = Form("hYield_eta_INT_1D_F%d_C%dT%d",ifit,ic,iptt);
+                    name = Form("hYield_INT_eta_pta_PbPb_1D_F%d_C%dT%d",ifit,ic,iptt);
                     hIAA_eta_INT_1d[ifit][ic][iptt] = (TH1D*)((TH1D*)fAA->FitResultsEta->FindObject(name))->Clone();
-                    name = Form("hYield_eta_INT_1D_F%d_C%dT%d",ifit,0,iptt);
+                    name = Form("hYield_INT_eta_pta_pp_1D_F%d_C%dT%d",ifit,0,iptt);
                     hIAA_eta_INT_1d[ifit][ic][iptt]->Divide( (TH1D*)fPP->FitResultsEta->FindObject(name) );
 
-                    name = Form("hYield_eta_INT_2D_F%d_C%dT%d",ifit,ic,iptt);
+                    name = Form("hYield_INT_eta_pta_PbPb_2D_F%d_C%dT%d",ifit,ic,iptt);
                     hIAA_eta_INT_2d[ifit][ic][iptt] = (TH1D*)((TH1D*)fAA->FitResultsEta->FindObject(name))->Clone();
-                    name = Form("hYield_eta_INT_2D_F%d_C%dT%d",ifit,0,iptt);
+                    name = Form("hYield_INT_eta_pta_pp_2D_F%d_C%dT%d",ifit,0,iptt);
                     hIAA_eta_INT_2d[ifit][ic][iptt]->Divide( (TH1D*)fPP->FitResultsEta->FindObject(name) );
-
-                    /*
-                    for(int isub=0; isub<kS; isub++)
-                    {
-                        hIAA_phi[ifit][isub][ic][iptt] = (TH1D*)fAA->hYield_phi[ifit][isub][ic][iptt]->Clone();
-                        hIAA_phi[ifit][isub][ic][iptt]->Divide( (TH1D*)fPP->hYield_phi[ifit][isub][0][iptt] );
-
-                        hIAA_phi_INT[ifit][isub][ic][iptt] = (TH1D*)fAA->hYield_phi_Int[ifit][isub][ic][iptt]->Clone();
-                        hIAA_phi_INT[ifit][isub][ic][iptt]->Divide( (TH1D*)fPP->hYield_phi_Int[ifit][isub][0][iptt] );
-
-                    }
-                    */
                 }
             }
         }
-        cout << "MIaa::CreateIAApta() done...\n";
+        std::cout << "MIaa::CreateIAApta() done...\n";
 
     }
     void CreateIAAdeta()
@@ -113,7 +100,12 @@ public:
                 }
             }
         }
-        cout << "MIaa::CreateIAAdeta() done...\n";
+        std::cout << "MIaa::CreateIAAdeta() done...\n";
+        for(int ib=1;ib<fPP->hDEtaSig[0][0][3][3]->GetNbinsX(); ib++)
+        {
+            std::cout <<fPP->hDEtaSig[0][0][3][3]->GetBinContent(ib) << "\t" << fPP->hDEtaSig[0][0][3][3]->GetBinError(ib) << std::endl;
+        }
+
     }
 
 

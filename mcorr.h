@@ -12,8 +12,8 @@
 #include <TString.h>
 #include <TFitResultPtr.h>
 #include <THashList.h>
-#include<iostream>
-#include<fstream>
+#include <iostream>
+#include <fstream>
 #include <typeinfo>
 
 #include "AliJHistManagerROOT6.cxx"
@@ -655,7 +655,7 @@ class MCorr
                             //scaleMix = 2./hDPhiMix[ie][ic][iptt][ipta]->Integral();
                             //int binAtZero = hDPhiMix[0][ic][iptt][ipta]->FindBin(0.);
                             //scaleMix = hDPhiMix[0][ic][iptt][ipta]->GetBinContent( binAtZero );
-                            scaleMix = 1./( GetMixedNorm1D( hDPhiMix[ie][ic][iptt][ipta]) );
+                            scaleMix = 1./( mt->GetMixedNorm1D( hDPhiMix[ie][ic][iptt][ipta]) );
 
                             hDPhiMix[ie][ic][iptt][ipta]->Scale( scaleMix );
                             hDPhiReal[ie][ic][iptt][ipta]->Add( hDPhiRaw[ie][ic][iptt][ipta] );
@@ -709,39 +709,7 @@ class MCorr
             return Form("%s_C%dV%dT%dA%d",fTypeName.Data(),ic,iv,iptt,ipta);
         }
 
-        double GetMixedNorm1D(TH1D * hmix)
-        // Average over mixed event's 2 bins around (0)
-        // (instead of using value at (0) )
-        {
-            double scaleMix = 0;
-            double eps = 0.001;
-            Int_t scaleMixBins[2];
-            scaleMixBins[0] = hmix->FindBin(eps);
-            scaleMixBins[1] = hmix->FindBin(-1.*eps);
 
-            for(Int_t ib=0; ib<2; ib++)
-                scaleMix += hmix->GetBinContent( scaleMixBins[ib] );
-
-            return scaleMix/2.;
-        }
-
-        double GetMixedNorm2D(TH2D * hmix)
-        // Average over mixed event's 4 bins around (0,0)
-        // (instead of using value at (0,0) )
-        {
-            double scaleMix = 0;
-            double eps = 0.001;
-            Int_t scaleMixBins[4];
-            scaleMixBins[0] = hmix->FindBin(eps, eps);
-            scaleMixBins[1] = hmix->FindBin(eps, -1.*eps);
-            scaleMixBins[2] = hmix->FindBin(-1.*eps, eps);
-            scaleMixBins[3] = hmix->FindBin(-1.*eps, -1.*eps);
-
-            for(Int_t ib=0; ib<4; ib++)
-                scaleMix += hmix->GetBinContent( scaleMixBins[ib] );
-
-            return scaleMix/4.;
-        }
 
         void LoadDEtaDPhi()
         {
@@ -824,7 +792,7 @@ class MCorr
                             for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
                             {
                                 htmp_raw = (TH2D*) htmp[0][ic][iv][iptt][ipta]->Clone(Form("%s_tmp",htmp[0][ic][iv][iptt][ipta]->GetName()));
-                                htmp_mix->Scale( 1./GetMixedNorm2D(htmp_mix) );
+                                htmp_mix->Scale( 1./mt->GetMixedNorm2D(htmp_mix) );
                                 htmp_raw->Divide(htmp_mix);
                                 hDEtaDPhiReal[ic][iptt][ipta]->Add( htmp_raw );
                             }
@@ -832,7 +800,7 @@ class MCorr
                         if(!fVertexCorr)
                         {
                             hDEtaDPhiReal[ic][iptt][ipta]->Add( hDEtaDPhiRaw[ic][iptt][ipta] );
-                            scaleMix = 1./( GetMixedNorm2D(hDEtaDPhiMix[ic][iptt][ipta]) );
+                            scaleMix = 1./( mt->GetMixedNorm2D(hDEtaDPhiMix[ic][iptt][ipta]) );
                             hDEtaDPhiMix[ic][iptt][ipta]->Scale(scaleMix);
                             hDEtaDPhiReal[ic][iptt][ipta]->Divide( hDEtaDPhiMix[ic][iptt][ipta] );
                         }
@@ -903,9 +871,9 @@ class MCorr
                         hDEtaRaw2DFar[ic][iptt][ipta]  = (TH1D*) hDEtaDPhiRaw[ic][iptt][ipta]->ProjectionX( Form("hDEtaRaw2DFar_%s",cta.Data()), phi_firstbin_far, phi_lastbin_far,"e" );
                         hDEtaMix2DFar[ic][iptt][ipta]  = (TH1D*) hDEtaDPhiMix[ic][iptt][ipta]->ProjectionX( Form("hDEtaMix2DFar_%s",cta.Data()), phi_firstbin_far, phi_lastbin_far,"e" );
                         hDEtaReal2DFar[ic][iptt][ipta] = (TH1D*) hDEtaDPhiReal[ic][iptt][ipta]->ProjectionX( Form("hDEtaReal2DFar_%s",cta.Data()), phi_firstbin_far, phi_lastbin_far,"e" );
-                        //hDEtaMix2DFar[ic][iptt][ipta]->Scale(1./GetMixedNorm1D( hDEtaMix2DFar[ic][iptt][ipta]));
+                        //hDEtaMix2DFar[ic][iptt][ipta]->Scale(1./mt->GetMixedNorm1D( hDEtaMix2DFar[ic][iptt][ipta]));
                         //hDEtaReal2DFar[ic][iptt][ipta]->Divide( hDEtaMix2DFar[ic][iptt][ipta] );
-                        hDEtaReal2DFar[ic][iptt][ipta]->Scale(1./GetMixedNorm1D( hDEtaReal2DFar[ic][iptt][ipta] ));
+                        hDEtaReal2DFar[ic][iptt][ipta]->Scale(1./mt->GetMixedNorm1D( hDEtaReal2DFar[ic][iptt][ipta] ));
 
 /*
 
@@ -1144,7 +1112,8 @@ class MCorr
             double scaleMix = 1.;
 
             TString cta, cvta;
-            TH1D * htmp;
+            TH1D * htmp = nullptr;
+            TH1D * htmp_mixed[20];
 
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
             {
@@ -1216,8 +1185,27 @@ class MCorr
                 }
             }
 
-            // Combine larger pT bins
+            // combine ptt and pta bins in mixed event for pp
+            // to achieve a better statistics
+            for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+            {
+                htmp_mixed[iv] = (TH1D*)hDEtaMixVtx[0][fVertexSkip][fMinPTtBin][0]->Clone("htmp_mixed");
+                htmp_mixed[iv]->Reset();
+                for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
+                {
+                    // finish and restart loop so one can choose higher pta bin for mixed event
+                    for(int ipta=0; ipta<fNumPta; ipta++)
+                    {
+                        if(fPTt->At(iptt) < fPTa->At(ipta))
+                            continue; // PTa upper border should be smaller than PTt lower
 
+                        htmp_mixed[iv]->Add( hDEtaMixVtx[0][iv][iptt][ipta] );
+                    }
+                }
+                htmp_mixed[iv]->Scale(1./mt->GetMixedNorm1D(htmp_mixed[iv]));
+            }
+
+            // Combine larger pT bins
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
             {
                 for(int ipta=0; ipta<fNumPta; ipta++)
@@ -1252,16 +1240,19 @@ class MCorr
                             }
 
                             hDEtaMix[ic][iptt][ipta]->Add(hDEtaMixVtx[ic][iv][iptt][ipta]);
-                            scaleMix = 1./( GetMixedNorm1D(hDEtaMixVtx[ic][iv][iptt][ipta]) );
+                            scaleMix = 1./( mt->GetMixedNorm1D(hDEtaMixVtx[ic][iv][iptt][ipta]) );
                             hDEtaMixVtx[ic][iv][iptt][ipta]->Scale(scaleMix);
                         }
 
-                        scaleMix = 1./( GetMixedNorm1D(hDEtaMix[ic][iptt][ipta]) );
+                        scaleMix = 1./( mt->GetMixedNorm1D(hDEtaMix[ic][iptt][ipta]) );
                         fFilipCorr_eta[ic][iptt][ipta] = scaleMix * 2 * dEta * hDEtaMix[ic][iptt][ipta]->Integral();
                         hDEtaMix[ic][iptt][ipta]->Scale( scaleMix );
                     }
                 }
             }
+
+
+
 
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
             {
@@ -1280,10 +1271,15 @@ class MCorr
                             hDEtaReal[ic][iptt][ipta]->Reset();
                             for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
                             {
-                                if(iptt>ipta_mixed && ipta>ipta_mixed) hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt_mixed][ipta_mixed] );
-                                else if(iptt>ipta_mixed && ipta<=ipta_mixed) hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt_mixed][ipta] );
-                                else if(iptt<=ipta_mixed && ipta>ipta_mixed) hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt][ipta_mixed] );
-                                else hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt][ipta] );
+                                if(fType==kPbPb) {
+                                    if(iptt>ipta_mixed && ipta>ipta_mixed) hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt_mixed][ipta_mixed] );
+                                    else if(iptt>ipta_mixed && ipta<=ipta_mixed) hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt_mixed][ipta] );
+                                    else if(iptt<=ipta_mixed && ipta>ipta_mixed) hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt][ipta_mixed] );
+                                    else hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt][ipta] );
+                                }
+                                else if(fType==kPP)
+                                    hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( htmp_mixed[iv] );
+                                else {cerr<<"MCorr::LoadDEtaHistos()::unknown type (kPP, kPbPb defined)\n";}
 
                                 hDEtaReal[ic][iptt][ipta]->Add( hDEtaRealVtx[ic][iv][iptt][ipta] );
                             }
@@ -1650,9 +1646,9 @@ class MCorr
 
                         MPlot * mdetam = new MPlot(++iplot, "#Delta#eta", "counts",true);
                         hDEtaMixTmp = (TH1D*) hDEtaMix[ic][iptt][ipta]->Clone();
-                        hDEtaMixTmp->Scale( 1./GetMixedNorm1D(hDEtaMixTmp) );
+                        hDEtaMixTmp->Scale( 1./mt->GetMixedNorm1D(hDEtaMixTmp) );
                         hDEtaMix2DTmp = (TH1D*) hDEtaMix2D[ic][iptt][ipta]->Clone();
-                        hDEtaMix2DTmp->Scale( 1./GetMixedNorm1D(hDEtaMix2DTmp) );
+                        hDEtaMix2DTmp->Scale( 1./mt->GetMixedNorm1D(hDEtaMix2DTmp) );
                         hList = { hDEtaMixTmp, hDEtaMix2DTmp };
                         mdetam->addHList(hList, legList);
                         mdetam->AddInfo( BuildInfo() );
