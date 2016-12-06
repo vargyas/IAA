@@ -467,7 +467,8 @@ class MPlot
                 ymin = ranges[0]-height*yw_low;
                 ymax = ranges[1]+height*yw_high;
             }
-
+            //h->GetXaxis()->SetRangeUser( xmin, xmax );
+            //h->GetYaxis()->SetRangeUser( ymin, ymax );
             h->GetXaxis()->SetLimits( xmin, xmax );
             h->GetYaxis()->SetLimits( ymin, ymax );
         }

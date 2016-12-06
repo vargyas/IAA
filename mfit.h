@@ -436,6 +436,7 @@ public:
         double yield=-1;
         switch( fFuncType )
         {
+            case kTwoGenGaussConst: yield=TMath::Sqrt(pow(ffit->GetParameter(1),2.)+pow(ffit->GetParameter(4),2.));
             case kKaplanConst : yield=GetYieldIntegral();  break;
             case kKaplanFlow  : yield=GetYieldIntegral();  break;
             case kCauchyConst : yield=GetYieldIntegral();  break;
@@ -449,6 +450,7 @@ public:
         double yielderr=-1;
         switch( fFuncType )
         {
+            case kTwoGenGaussConst: yielderr=TMath::Sqrt(pow(ffit->GetParError(1),2.)+pow(ffit->GetParError(4),2.));
             case kKaplanConst : yielderr=GetYiedIntegralError(ptr);  break;
             case kKaplanFlow  : yielderr=GetYiedIntegralError(ptr);  break;
             case kCauchyConst : yielderr=GetYiedIntegralError(ptr);  break;
@@ -533,7 +535,7 @@ public:
         else {
             double alpha = ffit->GetParameter(2);
             double beta  = ffit->GetParameter(3);
-            width = alpha*sqrt( TMath::Gamma(3./beta)/ TMath::Gamma(1./beta) );
+            width = alpha*TMath::Sqrt( TMath::Gamma(3./beta)/ TMath::Gamma(1./beta) );
         }
         return width;
     }
@@ -650,9 +652,14 @@ public:
     }
     void DrawTwoGenGaussConst(){
         //Sum
+        double yield1_temp = ffit->GetParameter(1);
+        double yield2_temp = ffit->GetParameter(4);
         ffit->SetLineWidth(2); ffit->SetLineStyle(9); ffit->SetLineColor(kYellow+2); ffit->DrawClone("lsame");
         //Pedestal
         ffit->SetParameter(1,0); ffit->SetParameter(4,0); ffit->DrawClone("lsame");
+        //Two Gauss separately in the style of the pedestal
+        ffit->SetParameter(1,yield1_temp); ffit->DrawClone("lsame");
+        ffit->SetParameter(1,0); ffit->SetParameter(4,yield2_temp); ffit->DrawClone("lsame");
     }
 
 
@@ -686,8 +693,8 @@ public:
 
         //ffit->SetParLimits( 0, 0, 1e9 );
         //ffit->SetParLimits( 1, 0, 1e9 );
-        ffit->SetParLimits( 2, 0, 2.0 );
-        ffit->SetParLimits( 3, 0.5, 500. );
+        //ffit->SetParLimits( 2, 0, 2.0 );
+        ffit->SetParLimits( 3, 0.1, 100. );
 
         if( fIsGauss ) {
             myName = "Gauss+const.";

@@ -1,4 +1,6 @@
 #include <TH1.h>
+#include <TH1D.h>
+#include <TH1F.h>
 #include <TF1.h>
 #include <TString.h>
 #include <TLegend.h>
@@ -97,6 +99,17 @@ TGraphAsymmErrors * publishedIAA(int icase)
 
     return g;
 }
+// -------------------------------------
+// Published $I_{\rm AA}$ from pi0-hadron
+// correlation: arxiv:1608.07201
+// -------------------------------------
+TH1F * publishedIAA_pi0()
+{
+    // TODO handle syst errors
+    TFile * pubFile = TFile::Open("../data/published/HEPData-ins1483164-1-root.root");
+    TH1F * h = (TH1F*) pubFile->Get("Table 3/Hist1D_y1");
+    return h;
+}
 
 double GetRelErr(TH1D * h, int ib)
 {
@@ -180,6 +193,7 @@ TH1D * MergeCentAAPP(TH1D * hAA, TH1D * hPP)
 // -------------------------------------
 
 int main()
+//void processDraw()
 {
     // -------------------------------------
     // processing correlation from JCORRAN 
@@ -187,6 +201,7 @@ int main()
     // -------------------------------------
     // [type: pp/AA][syst: vertexcorr yes/no][syst: vertexcut 5-10 pp, 3-8 PbPb][syst: phiproj 0.15-0.4][syst: fitrange 1.0-1.6]
     //MCorr * mc[2][2][2][2][2];
+    int imcorr=0;
     MCorr * mc[2][3];
 
     AliJBin * Cent[2], * Vtx[2], * Eta[2], * Phi[2], * PTt[2], * PTa[2];
@@ -200,18 +215,27 @@ int main()
     const double etaCut = 1.0;
     const double phiCut = 0.2;
     const int NSetup[2] = {1, 3};
-    const TString dataDir = "/home/vargyas/cernbox/Work/ALICE/IAA/data/jcorran/";
+    const TString dataDir = "~/cernbox/Work/ALICE/IAA/data/jcorran/";
 
     // initalizing  pp
     const TString inNamePP = dataDir+"JDiHadronCorr_legotrain_allTrigg-CF_pp-1155_20160929-2048-2760GeV_LHC11a_p4_AOD113_noSDD.root"; // dEta < 1.6
-    mc[0][0] = new MCorr( kPP, inNamePP, "LHC11a", "113", "0", "withSDD", "TPCOnly", phiCut, etaCut, -10, minpt, 15, 0, true );
+    mc[0][0] = new MCorr( imcorr++, kPP, inNamePP, "LHC11a", "113", "0", "withSDD", "TPCOnly", phiCut, etaCut, -10, minpt, 15., 0, true );
     mc[0][0]->Initialize();
+
+    //const TString inNamePP = dataDir+"JDiHadronCorr_legotrain_allTrigg-CF_pp-1182_20161114-2103-2760GeV_LHC11a_p4_AOD113_withSDD.root"; // dEta < 1.6
+    //mc[0][0] = new MCorr( imcorr++, kPP, inNamePP, "LHC11a", "113", "0", "withSDD", "GlobalSDD", phiCut, etaCut, -10, minpt, 15., 0, true );
+    //mc[0][0]->Initialize();
 
 
     // initalizing  PbPb 
-    TString inNameAA = dataDir+"JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2978_20160929-2054_runlist_3-LHC10h_AOD86_MgFpMgFm.root";
-    mc[1][0] = new MCorr( kPbPb, inNameAA, "LHC10h", "86", "3", "", "TPCOnly", phiCut, etaCut, -8, minpt, 15., 0, true );
+    const TString inNameAA = dataDir+"JDiHadronCorr_legotrain_allTrigg-CF_PbPb-2978_20160929-2054_runlist_3-LHC10h_AOD86_MgFpMgFm.root";
+    mc[1][0] = new MCorr( imcorr++, kPbPb, inNameAA, "LHC10h", "86", "3", "", "TPCOnly", phiCut, etaCut, -8, minpt, 15., 0, true );
     mc[1][0]->Initialize();
+
+    //const TString inNameAA = dataDir+"JDiHadronCorr_legotrain_allTrigg-CF_PbPb-3146_20161114-2112_runlist_3-LHC10h_AOD86_MgFpMgFm.root";
+    //mc[1][0] = new MCorr( imcorr++, kPbPb, inNameAA, "LHC10h", "86", "3", "", "GlobalSDD", phiCut, etaCut, -8, minpt, 15., 0, true );
+    //mc[1][0]->Initialize();
+
     //mc[1][1] = new MCorr( kPbPb, inNameAA.ReplaceAll("runlist_3", "runlist_1"), "LHC10h", "86", "1", "", "TPCOnly", phiCut, etaCut, -8, minpt, 15., 1, false );
     //mc[1][1]->Initialize();
     //mc[1][2] = new MCorr( kPbPb, inNameAA.ReplaceAll("runlist_3", "runlist_2"), "LHC10h", "86", "2", "", "TPCOnly", phiCut, etaCut, -8, minpt, 15., 1, false );
@@ -219,7 +243,7 @@ int main()
     // -------------------------------------
 
     // fit, cent, setup, trigger, assoc
-    int kF=5, kC=5, kS=3, kT=5, kA=7;
+    int kF=2;// kC=5, kS=3, kT=5, kA=7;
 
     for(int it=0; it<2; it++)
     {
@@ -245,22 +269,25 @@ int main()
 //        for( int isetup=0; isetup<NSetup[itype]; isetup++ )
         for( int isetup=0; isetup<1; isetup++ )
         {
+            //mc[itype][isetup]->DoQA();
 
             mc[itype][isetup]->LoadDEtaDPhi();
             mc[itype][isetup]->ProjectDEtaDPhi(1.0);
             mc[itype][isetup]->LoadDEtaHistos();
-            mc[itype][isetup]->FitDEtaHistos("IEMRNSQ", fitrange_eta); //IEMRNSQ or WLRNSQ
+            mc[itype][isetup]->FitDEtaHistos("RNSQ", fitrange_eta); //IEMRNSQ or WLRNSQ
+            mc[itype][isetup]->SaveOutput();
 
             //mc[itype][isetup]->DrawWingCorr();
             //mc[itype][isetup]->DrawRaw2D1D();
-            mc[itype][isetup]->DrawDEta(1); // 1-1D, 2-2D
+            //mc[itype][isetup]->DrawDEta(1); // 1-1D, 2-2D
             //mc[itype][isetup]->DrawDEta();
-            mc[itype][isetup]->DrawFitQA();
-            mc[itype][isetup]->DrawFitQA();
+            //mc[itype][isetup]->DrawFitQA();
             //mc[itype][isetup]->Draw2DHistos();
-            mc[itype][isetup]->DrawRawMixed();
+            //mc[itype][isetup]->DrawRawMixed();
+
         }
     }  
+    //return;
 
 
     // -------------------------------------
@@ -323,7 +350,8 @@ int main()
     //void DrawFitWidthCent()
     {
         for(int iptt=minPtt; iptt<NumPtt[1]; iptt++){
-            for(int ipta=0; ipta<NumPta[1]; ipta++){
+            for(int ipta=0; ipta<NumPta[1]; ipta++){FilipIAA * iaafilip = new FilipIAA();
+
                 if( PTt[1]->At(iptt) <= PTa[1]->At(ipta) )
                     continue;
 
@@ -331,12 +359,12 @@ int main()
                 TH1D * h = nullptr;
                 for(int ifit=0; ifit<kF; ifit++) {
                     // only for Gaus, GenGaus, DoubleGaus
-                    if(ifit==0 || ifit==1 || ifit==4)
-                    {
+                    //if(ifit==0 || ifit==1 || ifit==4)
+                    //{
                         h = (TH1D*) MergeCentAAPP(mc[1][0]->GetFitResultCent("hWidth",1,ifit,iptt,ipta), mc[0][0]->GetFitResultCent("hWidth",1,ifit,iptt,ipta));
                         hList.push_back( h );
                         legList.push_back( mc[0][0]->mfit_eta_1d[ifit][0][iptt][0]->GetName() );
-                    }
+                    //}
                 }
                 MPlot * mwp_c = new MPlot(++iplot, "centrality [%]", "#sigma (fit)", false);
                 mwp_c->addHList(hList, legList, "PE");
@@ -395,15 +423,15 @@ int main()
                 MPlot * miaafilip = new MPlot(++iplot, "|#Delta#eta|", "I_{AA}",false);
                 hList.clear(); legList.clear();
 
-                for(int ifit=0; ifit<5; ifit++)
+                for(int ifit=0; ifit<kF; ifit++)
                 {
                     if(ifit==drawfit)
                     {
                         //ChangeIAAErrors(ic, iptt, ipta, mc[0][0], mc[1][0], miaa->hIAA_deta_1d[ifit][ic][iptt][ipta]);
-                        for(int is=0;is<1;is++) {
-                            hList.push_back(  miaa[is]->hIAA_deta_1d[ifit][ic][iptt][ipta] );
-                            legList.push_back( Form("RL%d",is+1) );
-                        }
+                        //for(int is=0;is<1;is++) {
+                            hList.push_back(  miaa[0]->hIAA_deta_1d[ifit][ic][iptt][ipta] );
+                            legList.push_back( "AN (2016)" );
+                        //}
                         //legList.push_back( mc[0][0]->mfit_eta_1d[ifit][0][iptt][ipta]->GetName() );
                     }
                 }
@@ -436,27 +464,25 @@ int main()
 
 
 
-
     // -------------------------------------
     // PLOTTING published IAA(pta)
     // -------------------------------------
     TGraphAsymmErrors * gPubIAA_c[3];  // published IAA (all 3 backg. subtraction)
-    for(int it=0; it<3; it++){ gPubIAA_c[it] = publishedIAA(it);}
+    for(int it=0; it<3; it++) { gPubIAA_c[it] = publishedIAA(it);}
 
-    for(int ic=0; ic<NumCent[1]; ic++)
+    for(int ifit=0; ifit<2; ifit++)
     {
-        int iptt = mc[0][0]->fPTt->GetBin(8.);
-        // draw IAA from integral --------------------
-        MPlot * mpiaa = new MPlot(iplot++, "p_{T, assoc} [GeV]", "I_{AA}", false);
-        mpiaa->SetPalette(1); // set to full symbols
-        hList.clear(); legList.clear();
-        cout << ic << "\t" << iptt<<"\t" << endl;
-        for(int ifit=0; ifit<5; ifit++)
+        for(int ic=0; ic<NumCent[1]; ic++)
         {
-            hList.push_back( (TH1D*)miaa[0]->hIAA_eta_1d[ifit][ic][iptt]);
+            int iptt = mc[0][0]->fPTt->GetBin(8.);
+            // draw IAA from integral --------------------
+            MPlot * mpiaa = new MPlot(iplot++, "p_{T, assoc} [GeV]", "I_{AA}", false);
+            mpiaa->SetPalette(0); // set to full symbols
+
+            hList = { (TH1D*)miaa[0]->hIAA_eta_1d[ifit][ic][iptt], miaa[0]->hIAA_eta_INT_1d[ifit][0][iptt], publishedIAA_pi0() };
             //hList.push_back( (TH1D*)miaa->hIAA_eta[ifit][ic][iptt] );
-            legList.push_back( mc[0][0]->mfit_eta_1d[ifit][0][iptt][2]->GetName() );
-        }
+            legList = { mc[0][0]->mfit_eta_1d[ifit][0][iptt][2]->GetName(), "bin counting", "#pi^{0} paper" };
+
         mpiaa->addHList(hList, legList, "PE");
         mpiaa->Draw();
 
@@ -471,7 +497,8 @@ int main()
         mpiaa->DrawThisTGraphAsymmErrors( gPubIAA_c[2], "PE same", 26, 1 );
 
         mpiaa->SetLimitsXY(0,10,0.5,3.5);
-        mpiaa->Save(Form("../figs/IAA/IAA_C0%d", ic));
+        mpiaa->Save(Form("../figs/IAA/IAA_C0%dF0%d",ic,ifit));
+        }
     }
     cout << "\n IAA(pta) done...\n";
 
@@ -484,9 +511,9 @@ int main()
         MPlot * miaa_f_pta = new MPlot(iplot++, "p_{T, assoc} [GeV]", "I_{AA}", false);
         miaa_f_pta->SetPalette(1); // set to full symbols
         // draw IAA from with and compare with Filip's preliminary --------------------
-        hList   = { miaa[0]->hIAA_eta_1d[ifit][0][iptt_pub]  };
-        legList = { mc[0][0]->mfit_eta_1d[ifit][0][iptt_pub][2]->GetName() };
-        //legList = { Form("#eta corr. |#Delta#phi|<%.1f (fit)",mc[0][0]->fPhiCut), Form("#eta corr. |#Delta#phi|<%.1f (integral)",mc[0][0]->fPhiCut)  };
+        hList   = { miaa[0]->hIAA_eta_1d[ifit][0][iptt_pub], miaa[0]->hIAA_eta_INT_1d[ifit][0][iptt_pub]  };
+        legList = { mc[0][0]->mfit_eta_1d[ifit][0][iptt_pub][2]->GetName(), "bin counting" };
+
         miaa_f_pta->addHList(hList, legList, "PE");
         miaa_f_pta->Draw();
         miaa_f_pta->DrawThisTGraphAsymmErrors( filipIAApta(true), "PE same", 26, 1 );
