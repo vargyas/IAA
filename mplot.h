@@ -26,6 +26,9 @@
  * This class contains all style formatting and abbreviations for an easier plot. 
  * The goal is to set the most common practices as default for a shorter plotting macro. 
  * More specific plots requiring additional setup can be also set here.
+ *
+ * Author: M. Vargyas 
+ * Email: mvargyas@cern.ch
  * ***************************************************************************
  */
 
@@ -34,45 +37,9 @@ std::array<int,10> Colors { { 601, 634, 417, 433, 635, 619, 603, 636, 719, 435} 
 std::array<int,13> Markers_full { { 20, 21, 25, 22, 26, 23, 27, 33, 27, 20, 24, 25, 26 } }; 
 std::array<int,13> Markers_open { { 24, 25, 26, 27, 33, 27, 20, 24, 25, 26, 27, 28, 29 } }; 
 
-void DivideDiffBin(TH1* h1, TH1* h2){
-    int nb1 = h1->GetNbinsX();
-    int nb2 = h2->GetNbinsX();
 
-    if(nb1 >= nb2) {
-        for(int ib=1; ib<=nb1; ib++){
-            double x  = h1->GetBinCenter(ib);
-            double y1 = h1->GetBinContent(ib);
-            double e1 = h1->GetBinError(ib);
-            double y2 = h2->GetBinContent(h2->FindBin(x));
-            double e2 = h2->GetBinError(h2->FindBin(x));
-            y2!=0 ? h1->SetBinContent(ib,y1/y2) :h1->SetBinContent(ib,0);
-            if(y1!=0 && y2!=0){
-                h1->SetBinError(ib, y1/y2*sqrt(e1*e1/y1/y1 + e2*e2/y2/y2));
-            }else{
-                h1->SetBinError(ib,0);
-            }
-        }
-    }
-
-    if(nb1 < nb2) {
-        for(int ib=1; ib<=nb2; ib++){
-            double x  = h2->GetBinCenter(ib);
-            double y2 = h2->GetBinContent(ib);
-            double e2 = h2->GetBinError(ib);
-            double y1 = h1->GetBinContent(h1->FindBin(x));
-            double e1 = h1->GetBinError(h1->FindBin(x));
-            y2!=0 ? h1->SetBinContent(ib,y1/y2) :h1->SetBinContent(ib,0);
-            if(y1!=0 && y2!=0){
-                h1->SetBinError(ib, y1/y2*sqrt(e1*e1/y1/y1 + e2*e2/y2/y2));
-            }else{
-                h1->SetBinError(ib,0);
-            }
-        }
-    }
-}
 
 class MPlot
-
 {
     private:
         // fCanvas 
@@ -114,6 +81,8 @@ class MPlot
         // Plotting histos and graphs stored in TObjArray
         TObjArray * histList;
         TObjArray * histRatioList;
+        TObjArray * fitRatioList; // ratio can be fit with pol0,1,2.
+        TObjArray * fitRatioErrList; // histogram holding the fit band with 95% confidence level
         TObjArray * functList;
         TObjArray * graphList;
 
@@ -132,7 +101,14 @@ class MPlot
         TString fOptRatioHisto;
         TString fOptLegend;
 
+        int fDoFitRatio; // if > 0 fit the ratio histograms with 0 = pol0, 1 = pol1, 2 = pol2
+        bool fPlotFitRatio; // set whether to show the fit of the ratio histograms
+        Double_t fFitMin;
+        Double_t fFitMax;
+        Double_t fErrorCorr; // correlation between the two datasets compared (from -1 to 1), used for changing the errors on the ratio
+
     public:
+        // pad and canvas is accessible from outside of this class
         TCanvas * fCanvas;    
         TPad * fPad;              
         TPad * fPadRatio;
@@ -149,6 +125,7 @@ class MPlot
             fSplitRatio = splitratio;
             Initialize(index, xlab, ylab, sp);
             fMarkers = Markers_open; //open default, set later with SetPalette
+
         }
         ~MPlot(){
             delete fCanvas;
@@ -161,6 +138,67 @@ class MPlot
             //    delete fPadRatio;
             //    delete histRatioList;
             //}
+        }
+
+        /*
+         * Tool to divide histograms with different binning.
+         * Result takes into account given correlation factor (fErrorCorr)
+         * when calculating the error on the ratio
+         */
+        void DivideDiffBin(TH1* h1, TH1* h2)
+        {
+            const int nb1 = h1->GetNbinsX();
+            const int nb2 = h2->GetNbinsX();
+
+            double x = 0;
+            double y1 = 0;
+            double y2 = 0;
+            double e1 = 0;
+            double e2 = 0;
+
+            if(nb1==nb2) {//h1->Divide(h2);
+                for(int ib=1; ib<=nb1; ib++){
+                    x  = h1->GetBinCenter(ib);
+                    y1 = h1->GetBinContent(ib);
+                    e1 = h1->GetBinError(ib);
+                    y2 = h2->GetBinContent(ib);
+                    e2 = h2->GetBinError(ib);
+                    y2!=0 ? h1->SetBinContent(ib,y1/y2) : h1->SetBinContent(ib,0);
+                    if(y1!=0 && y2!=0) h1->SetBinError(ib, y1/y2*sqrt(e1*e1/y1/y1 + e2*e2/y2/y2 - 2* fErrorCorr * e1*e2/y1/y2 ));
+                    else h1->SetBinError(ib,0);
+                }
+            }
+            else if(nb1 > nb2) {
+                for(int ib=1; ib<=nb1; ib++){
+                    x  = h1->GetBinCenter(ib);
+                    y1 = h1->GetBinContent(ib);
+                    e1 = h1->GetBinError(ib);
+                    y2 = h2->GetBinContent(h2->FindBin(x));
+                    e2 = h2->GetBinError(h2->FindBin(x));
+                    y2!=0 ? h1->SetBinContent(ib,y1/y2) : h1->SetBinContent(ib,0);
+                    if(y1!=0 && y2!=0){
+                        h1->SetBinError(ib, y1/y2*sqrt(e1*e1/y1/y1 + e2*e2/y2/y2 - 2* fErrorCorr * e1*e2/y1/y2));
+                    }else{
+                        h1->SetBinError(ib,0);
+                    }
+                }
+            }
+
+            else if(nb1 < nb2) {
+                for(int ib=1; ib<=nb2; ib++){
+                    x  = h2->GetBinCenter(ib);
+                    y2 = h2->GetBinContent(ib);
+                    e2 = h2->GetBinError(ib);
+                    y1 = h1->GetBinContent(h1->FindBin(x));
+                    e1 = h1->GetBinError(h1->FindBin(x));
+                    y2!=0 ? h1->SetBinContent(ib,y1/y2) : h1->SetBinContent(ib,0);
+                    if(y1!=0 && y2!=0){
+                        h1->SetBinError(ib, y1/y2*sqrt(e1*e1/y1/y1 + e2*e2/y2/y2 - 2* fErrorCorr * e1*e2/y1/y2));
+                    }else{
+                        h1->SetBinError(ib,0);
+                    }
+                }
+            }
         }
 
         /*
@@ -177,7 +215,7 @@ class MPlot
             functList = new TObjArray();
             graphList = new TObjArray();
 
-            l = new TLegend(0.55, 0.65, 0.92, 0.92, "", "brNDC");
+            l = new TLegend(0.65, 0.65, 0.92, 0.92, "", "brNDC");
             l->SetFillStyle(0); l->SetBorderSize(0); l->SetTextSize(0.03);
 
             lNFO = new TLegend(0.0, 0.8, 0.92, 0.92, "", "brNDC");
@@ -191,6 +229,10 @@ class MPlot
                 fSplitRatio = 1;
                 InitializeCanvas();
             }
+            fPlotFitRatio = false;
+            fDoFitRatio = -1;
+            fFitMin = -1;
+            fFitMax = -1;
         }
 
         /* 
@@ -317,6 +359,35 @@ class MPlot
             if(isSplit){
                 InitHRatio();
                 SetHfrRange( fHfr_ratio, histRatioList, "auto" );
+                if(fDoFitRatio>=0) FitHRatio();
+            }
+        }
+
+        /*
+         * Create and fit the functions to the ratio histograms
+         */
+        void FitHRatio()
+        {
+            fitRatioList = new TObjArray();
+            fitRatioErrList = new TObjArray();
+
+            //Double_t xmin = ((TH1D*)histRatioList->At(0))->GetXaxis()->GetXmin();
+            //Double_t xmax = ((TH1D*)histRatioList->At(0))->GetXaxis()->GetXmax();
+            for(int i=0; i<histRatioList->GetEntriesFast();++i)
+            {
+                TString name = Form("%s_fit",((TH1D*)histRatioList->At(i))->GetName());
+                TF1 * f = new TF1(name, Form("pol%d",fDoFitRatio),fFitMin,fFitMax);
+                ((TH1D*)histRatioList->At(i))->Fit(f, "EMRNSQ", "", fFitMin, fFitMax);
+                f->SetLineColor(((TH1D*)histRatioList->At(i))->GetLineColor());
+                f->SetLineWidth(2);
+                fitRatioList->Add(f);
+
+                name = Form("%s_systerr",((TH1D*)histRatioList->At(i))->GetName());
+                TH1D * hsysterr = (TH1D*)((TH1D*)histRatioList->At(i))->Clone(name);
+                hsysterr->Reset();
+                (TVirtualFitter::GetFitter())->GetConfidenceIntervals(hsysterr);
+                hsysterr->SetFillColorAlpha(((TH1D*)histRatioList->At(i))->GetMarkerColor(), 0.2);
+                fitRatioErrList->Add(hsysterr);
             }
         }
 
@@ -360,7 +431,13 @@ class MPlot
                 fCanvas->cd(); fPadRatio->Draw(); fPadRatio->cd(); fHfr_ratio->Draw();
                 for( Int_t i=0; i<histRatioList->GetEntriesFast();i++) { 
                     histRatioList->At(i)->Draw(fOptRatioHisto+"same");
+                    if(fPlotFitRatio) {
+                        fitRatioList->At(i)->DrawClone("lsame");
+                        ((TH1D*)fitRatioErrList->At(i))->SetMarkerSize(0);
+                        fitRatioErrList->At(i)->DrawClone("E3 same ");
+                    }
                 }
+                fPadRatio->Update();
             }
         }
 
@@ -392,6 +469,7 @@ class MPlot
             fPad->cd();
             g->SetMarkerColor(color);
             g->SetLineColor(color);
+			g->SetFillColorAlpha(color,0.6);
             g->SetMarkerStyle(marker);
             g->Draw(opt);
         }
@@ -400,14 +478,13 @@ class MPlot
         void DrawThisTH1( TH1 * h, TString opt, int marker, int color, double alpha=1){
             fPad->cd();
             h->SetMarkerStyle(marker);
-            if(alpha==1){ h->SetMarkerColor(color); }
-            else { h->SetFillColorAlpha(color, alpha); }
+            h->SetFillColorAlpha(color, alpha);
             h->SetLineColor(color);
             h->Draw(opt);
         }
 
         void Save(TString filename ){
-            fCanvas->SaveAs( filename+".pdf" );
+			fCanvas->SaveAs( filename+".pdf" );
         }
 
         void AddInfo( TString textNFO ) {
@@ -484,6 +561,14 @@ class MPlot
             fPad->SetLogy(logy);
             if(isSplit && logx){ fPadRatio->SetLogx( logx ); }
         }
+        void SetRatioFit(int fitratio, bool plotfit, double fitmin, double fitmax, double corr=0) {
+            fDoFitRatio = fitratio;
+            fPlotFitRatio = plotfit;
+            fFitMin = fitmin;
+            fFitMax = fitmax;
+            fErrorCorr = corr;
+        }
+
         void SetGridY() { fPad->SetGridy(1); }
         void SetGridX() { 
             fPad->SetGridx(1);
@@ -562,7 +647,7 @@ class MPlot
             }
             fHfr = new TH2F(Form("hfr%d", fNameIndex), "tit",nbins, xbins, 10, 0, 1000);
             for(int ib=1;ib<=nbins;ib++) fHfr->GetXaxis()->SetBinLabel(ib, h->GetXaxis()->GetBinLabel(ib));
-            delete xbins;
+			delete[] xbins;
             fHfr->LabelsOption("d","x");
             SetHfrRange( fHfr, histList, "auto" );
             SetHfrStyle( fHfr, fXTitle, fYTitle, 1, true);

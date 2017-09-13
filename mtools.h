@@ -25,41 +25,75 @@ private:
 public:
     MTools() { mToolsIndex=0; }
 
-
-
-
-    double GetMixedNorm1D(TH1D * hmix)
-    // Average over mixed event's 2 bins around (0)
-    // (instead of using value at (0) )
+    // --------------------------------------------
+    // Gets number of bins in given range
+    // --------------------------------------------
+    Int_t GetBins(TH1D * h, double xmin, double xmax)
     {
-        double scaleMix = 0;
-        double eps = 0.001;
-        Int_t scaleMixBins[2];
-        scaleMixBins[0] = hmix->FindBin(eps);
-        scaleMixBins[1] = hmix->FindBin(-1.*eps);
-
-        for(Int_t ib=0; ib<2; ib++)
-            scaleMix += hmix->GetBinContent( scaleMixBins[ib] );
-
-        return scaleMix/2.;
+        return h->FindBin(xmax)-h->FindBin(xmin+h->GetBinWidth(1)/10.);
     }
 
-    double GetMixedNorm2D(TH2D * hmix)
-    // Average over mixed event's 4 bins around (0,0)
-    // (instead of using value at (0,0) )
+    // --------------------------------------------
+    // In case of a binned triangle shape, this estimates
+    // the correction to be applied at 0
+    // --------------------------------------------
+    double TriangleBinCorrection(TH1D * hmix, double xmax)
+    {
+        double etabin = hmix->GetBinWidth(1)/2.;
+        hmix->Print();
+        std::cout << 1 + etabin/(xmax-etabin) << std::endl;
+        return 1 + etabin/(xmax-etabin);
+    }
+    double TriangleBinCorrection(TH2D * hmix, double xmax)
+    {
+        double etabin = hmix->GetXaxis()->GetBinWidth(1)/2.;
+        return 1 + etabin/(xmax-etabin);
+    }
+
+    // --------------------------------------------
+    // Average over mixed event's n bins around (0)
+    // (instead of using value at (0) )
+    // --------------------------------------------
+    double GetMixedNorm1D(TH1D * hmix, const Int_t n = 2)
     {
         double scaleMix = 0;
         double eps = 0.001;
-        Int_t scaleMixBins[4];
-        scaleMixBins[0] = hmix->FindBin(eps, eps);
-        scaleMixBins[1] = hmix->FindBin(eps, -1.*eps);
-        scaleMixBins[2] = hmix->FindBin(-1.*eps, eps);
-        scaleMixBins[3] = hmix->FindBin(-1.*eps, -1.*eps);
 
-        for(Int_t ib=0; ib<4; ib++)
-            scaleMix += hmix->GetBinContent( scaleMixBins[ib] );
+        Int_t firstminus = hmix->FindBin(-1.*eps);
+        Int_t firstplus  = hmix->FindBin(eps);
 
-        return scaleMix/4.;
+        for(Int_t ib=0; ib<n/2; ++ib) {
+            scaleMix += hmix->GetBinContent( firstplus+ib );
+            scaleMix += hmix->GetBinContent( firstminus-ib);
+        }
+        return scaleMix/double(n);
+    }
+    // --------------------------------------------
+    // Average over (0, 0.6*pi) - (0, 1.4*pi) range
+    // near-side is affected by two-track merging
+    // --------------------------------------------
+    double GetMixedNorm2D(TH2D * hmix, double xmax = 1.6)
+
+    {
+		int count = 0;
+        double scaleMix = 0;
+        double eps = 0.001;
+
+		Double_t phi[2] = { (1.-0.4)*TMath::Pi()+eps, (1.+0.4)*TMath::Pi()-eps };
+		Double_t eta[2] = { -1.*eps, eps };
+
+        // first and last bin in y axis
+		Int_t phibin[2] = { hmix->GetYaxis()->FindBin(phi[0]), hmix->GetYaxis()->FindBin(phi[1])};
+		// first and last bin in x axis
+		Int_t etabin[2] = { hmix->GetXaxis()->FindBin(eta[0]), hmix->GetXaxis()->FindBin(eta[1])};
+
+		for(Int_t ip=phibin[0]; ip<=phibin[1]; ++ip) {
+			for(Int_t ie=etabin[0]; ie<=etabin[1]; ++ie) {
+				scaleMix += hmix->GetBinContent(ie, ip);
+                ++count;
+			}
+		}
+        return scaleMix/double(count) * TriangleBinCorrection(hmix, xmax);
     }
 
 
@@ -171,19 +205,19 @@ public:
         TH1D *htmp  = (TH1D*) h->Clone(Form("%s_sig_tmp",hname.Data()));
         for(int ib=1; ib<=nb; ib++){
             htmp->SetBinContent(ib,fit->GetParameter(0));
-            htmp->SetBinError(ib, fit->GetParError(0));
+            htmp->SetBinError(ib, fit->GetParError(0));// don't add fiterr to stat. err, it should go to systerr.
+            //htmp->SetBinError(ib, 0);
         }
         hsig->Add(htmp, -1.0);
         return hsig;
     }
-
     void subtractConstTH1(TH1 * h) // fit and subtract constant from deta histogram
     {
-        MFit * fit = new MFit(0, 0, h, 0.0, 1.6, false); // larger range for better backg. estimation
-        h->Fit( fit->ffit, "EMR");
+        MFit * fit = new MFit(-1, 0, 0, h, 0.0, 1.6, true); // larger range for better backg. estimation
+		h->Fit( fit->ffit, "IEMNRNQ");
         double bg = fit->ffit->GetParameter(0);
         //double bgerr = fit->ffit->GetParError(0);
-        subtractConstTH1(h, bg);
+		subtractConstTH1(h, bg);
         delete fit;
     }
 
@@ -375,9 +409,10 @@ public:
 
         return hnew;
     }
-
+    // --------------------------------------------
     // Rebins a histogram according to other histograms bins
-    TH1D * RebinHistoToOther(TH1D * h_value, TH1D * h_bins) 
+    // --------------------------------------------
+    TH1D * RebinHistoToOther(TH1D * h_value, TH1D * h_bins)
    {
         const int nbins = h_bins->GetNbinsX();
 
@@ -444,7 +479,9 @@ public:
         }
         return hnew;
     }
+    // --------------------------------------------
     // Project TH2 to either X or Y axis along with an ellipse defined by major axises 
+    // --------------------------------------------
     TH1D * DoProjectionCircle(TH2D * h2, bool onX, const char *name, Int_t firstbin, Int_t lastbin, Double_t R, Option_t *option) const
     {
        const char *expectedName = 0;

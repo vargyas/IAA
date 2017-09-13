@@ -7,6 +7,7 @@
 #include "TMath.h"
 #include "TMatrixDSym.h"
 #include "TFitResult.h"
+#include "TColor.h"
 
 /*
  * ***************************************************************************
@@ -17,7 +18,7 @@
  */
 
 // numbering convention is that [fit flow] = [fit const +1 ]
-enum FitFuncType {kOneGenGaussConst, kOneGenGaussFlow, kKaplanConst, kKaplanFlow, kCauchyConst, kCauchyFlow, kQGaussConst, kQGaussFlow, kTwoGenGaussConst};
+enum FitFuncType {kOneGenGaussConst, kOneGenGaussFlow, kKaplanConst, kKaplanFlow, kCauchyConst, kCauchyFlow, kQGaussConst, kQGaussFlow, kTwoGenGaussConst, kOneSmallGaussConst};
 enum HistType {kDEta, kDPhi};
 
 
@@ -343,28 +344,29 @@ double QGaussFlow(double *x, double *par)
 class MFit
 {  
 private:
+    int    fIndex;
     int    binUnderLeft, binUnderRight;
     int    fFuncType, fHistType;
     bool   fIsGauss;
-    double nearRange, undereve;
+	double undereve;
     double fInt_min, fInt_max;
     TString myName;
 
 public:
-
-    TF1 * ffit;
     double fitmin, fitmax;
+    TF1 * ffit;
+    TH1D * hDEtaErr;
 
     /*
      * DEFAULT CONSTRUCTOR
      */
     MFit() :
+        fIndex(-1),
         binUnderLeft(-1),
         binUnderRight(-1),
         fFuncType(-1),
         fHistType(-1),
         fIsGauss(true),
-        nearRange(0),
         undereve(0),
         fInt_min(0),
         fInt_max(0),
@@ -372,19 +374,20 @@ public:
         fitmin(0),
         fitmax(0)
     {
+        hDEtaErr = nullptr;
         std::cout << "MFit::Default constructor\n";
     }
 
     /*
      * CONSTRUCTOR
      */
-    MFit( int fitType, int histType, TH1 * hidFor,  double fmin, double fmax, bool IsGauss = false  ) :
+    MFit( int index, int fitType, int histType, TH1 * hidFor,  double fmin, double fmax, bool IsGauss = false  ) :
+        fIndex(index),
         binUnderLeft(-1),
         binUnderRight(-1),
         fFuncType(fitType),
         fHistType(histType),
         fIsGauss(IsGauss),
-        nearRange(0),
         undereve(0),
         fInt_min(0),
         fInt_max(0),
@@ -392,17 +395,19 @@ public:
         fitmin(fmin),
         fitmax(fmax)
     {
+        hDEtaErr = nullptr;
         switch( fFuncType )
         {
-            case kOneGenGaussConst : InitOneGenGaussConst(hidFor); break;
-            case kKaplanConst      : InitKaplanConst(hidFor);      break;
-            case kOneGenGaussFlow  : InitOneGenGaussFlow(hidFor);  break;
-            case kKaplanFlow       : InitKaplanFlow(hidFor);       break;
-            case kCauchyConst      : InitCauchyConst(hidFor);      break;
-            case kCauchyFlow       : InitCauchyFlow(hidFor);       break;
-            case kQGaussConst      : InitQGaussConst(hidFor);      break;
-            case kQGaussFlow       : InitQGaussFlow(hidFor);       break;
-            case kTwoGenGaussConst : InitTwoGenGaussConst(hidFor); break;
+            case kOneGenGaussConst   : InitOneGenGaussConst(hidFor); break;
+            case kKaplanConst        : InitKaplanConst(hidFor);      break;
+            case kOneGenGaussFlow    : InitOneGenGaussFlow(hidFor);  break;
+            case kKaplanFlow         : InitKaplanFlow(hidFor);       break;
+            case kCauchyConst        : InitCauchyConst(hidFor);      break;
+            case kCauchyFlow         : InitCauchyFlow(hidFor);       break;
+            case kQGaussConst        : InitQGaussConst(hidFor);      break;
+            case kQGaussFlow         : InitQGaussFlow(hidFor);       break;
+            case kTwoGenGaussConst   : InitTwoGenGaussConst(hidFor); break;
+            case kOneSmallGaussConst : InitOneSmallGaussConst(hidFor); break;
             default: std::cerr << "MFIT case not recognized...\n";
         }
         switch( fHistType )
@@ -414,6 +419,11 @@ public:
                 fInt_min = -0.45; fInt_max = 0.45;
                 break;
         }
+        hDEtaErr = (TH1D*) hidFor->Clone(Form("%s_%s",hidFor->GetName(),GetName().Data()));
+        hDEtaErr->Reset();
+        // set default minimizer:
+        // ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Fumili");
+
     }
     /*
      * DESTRUCTOR
@@ -506,13 +516,13 @@ public:
      * Gets width for the different cases
      */
     double GetWidth(){
-        double width=-1.;
+        double width=0;
         switch( fFuncType )
         {
             case kOneGenGaussConst : width = GetWidthOneGenGauss(); break; // 0
             case kOneGenGaussFlow  : width = GetWidthOneGenGauss(); break; // 1
             case kTwoGenGaussConst : width = GetWidthTwoGenGauss(); break;
-            default: width = -1;
+            default: width = 0;
         }
         return width;
     }
@@ -589,29 +599,57 @@ public:
      * Drawing for the different cases (all formatting is done here)
      * sets also the name for TLegend()
      */
-    void Draw(){
+	void Draw(int color=601){
+        ffit->SetLineWidth(2);
+
         switch( fFuncType ){
-            case kOneGenGaussConst : DrawOneGenGaussConst(); break; // 0
+			case kOneGenGaussConst : DrawOneGenGaussConst(color); break; // 0
             case kKaplanConst      : DrawKaplanConst();      break; // 2
             case kOneGenGaussFlow  : DrawOneGenGaussFlow();  break; // 3
             case kKaplanFlow       : DrawKaplanFlow();       break; // 5
             case kCauchyConst      : DrawCauchyConst();      break; // 6
             case kQGaussConst      : DrawQGaussConst();      break; //
             case kTwoGenGaussConst : DrawTwoGenGaussConst(); break;
+            case kOneSmallGaussConst : DrawSmallGaussConst(); break;
         }
     }
-    void DrawOneGenGaussConst(){
-        ffit->SetLineWidth(2);
+	void DrawOneGenGaussConst(int color=601){
+
+		int c_fit[] = {kBlack, kRed};
+        int l_fit[] = {8, 1};
+        int f_fit[] = {3005, 3007};
+
+		if(color!=601) {
+			c_fit[0] = color;
+			c_fit[1] = color;
+		}
+        int ii = int(!fIsGauss);
+
+        // Sum
+        ffit->SetLineColor(c_fit[ii]);
+        ffit->SetLineStyle(l_fit[ii]);
+        ffit->DrawClone("lsame");
+        // Pedestal
+        double yield = ffit->GetParameter(1);
+        ffit->SetParameter(1, 0);
+        ffit->DrawClone("lsame");
+        ffit->SetParameter(1, yield);
+        // Err
+        hDEtaErr->SetFillColorAlpha(c_fit[ii],0.2);
+        //hDEtaErr->SetFillColor(c_fit[ii]);
+        //hDEtaErr->SetFillStyle(3001);
+        hDEtaErr->DrawClone("E3 same");
+    }
+    void DrawSmallGaussConst()
+    {
         //Sum
-        if(fIsGauss)  { ffit->SetLineStyle(3); ffit->SetLineColor(kBlack); ffit->DrawClone("lsame"); }
-        if(!fIsGauss) { ffit->SetLineStyle(1); ffit->SetLineColor(kRed+1); ffit->DrawClone("lsame"); }
+        ffit->SetLineStyle(3); ffit->SetLineColor(kGreen+1); ffit->DrawClone("lsame");
         //Pedestal
         ffit->SetParameter(1, 0);
-        if(fIsGauss)  { ffit->SetLineStyle(3); ffit->SetLineColor(kBlack); ffit->DrawClone("lsame"); }
-        if(!fIsGauss) { ffit->SetLineStyle(1); ffit->SetLineColor(kRed+1); ffit->DrawClone("lsame"); }
+        ffit->DrawClone("lsame");
     }
+
     void DrawOneGenGaussFlow(){
-        ffit->SetLineWidth(2);
         //Sum
         if(fIsGauss)  { ffit->SetLineStyle(3); ffit->SetLineColor(kBlack); ffit->DrawClone("lsame"); }
         if(!fIsGauss) { ffit->SetLineStyle(1); ffit->SetLineColor(kRed+1); ffit->DrawClone("lsame"); }
@@ -622,7 +660,6 @@ public:
         delete flow;
     }
     void DrawKaplanConst(){
-        ffit->SetLineWidth(2);
         //Sum
         ffit->SetLineStyle(7); ffit->SetLineColor(kGreen+1); ffit->DrawClone("lsame");
         //Pedestal
@@ -630,7 +667,6 @@ public:
         ffit->SetLineStyle(7); ffit->SetLineColor(kGreen+1); ffit->DrawClone("lsame");
     }
     void DrawKaplanFlow(){
-        ffit->SetLineWidth(2);
         //Sum
         ffit->SetLineStyle(7); ffit->SetLineColor(kGreen+1); ffit->DrawClone("lsame");
         //Flow
@@ -667,12 +703,12 @@ public:
     /*
      * Initialize one generalized gaussian + const
      */
-    void InitOneGenGaussConst(TH1 * hidFor ) {
+    void InitOneGenGaussConst(TH1 * hidFor) {
         myName = "Gen.Gauss+const.";
         double lr=fitmin, ur=fitmax;
         double yield, width;
 
-        ffit = new TF1("ffit_GC", OneGenGaussConst, lr , ur, 4 );
+        ffit = new TF1(Form("ffit_GC_%d",fIndex), OneGenGaussConst, lr , ur, 4 );
         ffit->SetParNames("background", "yield", "width","power");
 
         if( fHistType==0 ) { // deta background region
@@ -689,18 +725,59 @@ public:
         yield = hidFor->Integral(hidFor->FindBin(0.0), hidFor->FindBin(width))-undereve;
 //            if(fHistType==1) yield=2.0*yield; // phi is not flipped
 
-        ffit->SetParameters( undereve, yield, width, 2. );
+		ffit->SetParameters( undereve, yield, width, 1.9 );
 
-        //ffit->SetParLimits( 0, 0, 1e9 );
-        //ffit->SetParLimits( 1, 0, 1e9 );
-        //ffit->SetParLimits( 2, 0, 2.0 );
-        ffit->SetParLimits( 3, 0.1, 100. );
+        // do not touch this initialisation!
+        //ffit->SetParLimits( 0, 0.01, 1e9 );
+        //ffit->SetParLimits( 1, 0.01, 1e9 );
+        //ffit->SetParLimits( 2, 0, 2.);
+        ffit->SetParLimits( 3, 1.1, 5. );
 
         if( fIsGauss ) {
             myName = "Gauss+const.";
             ffit->FixParameter(3, 2.);
         }
     }
+
+    /*
+     * Initialize one generalized gaussian + const
+     */
+    void InitOneSmallGaussConst(TH1 * hidFor ) {
+        myName = "Gauss+const. (small range)";
+        double lr=fitmin, ur=fitmax;
+        double yield, width;
+
+        ffit = new TF1("ffit_SC", OneGenGaussConst, lr , ur, 4 );
+        ffit->SetParNames("background", "yield", "width","power");
+
+        if( fHistType==0 ) { // deta background region
+            binUnderLeft  = hidFor->FindBin(1.);
+            binUnderRight = hidFor->FindBin(1.5);
+        }
+        if( fHistType==1 ) { // dphi background region
+            binUnderLeft  = hidFor->FindBin(0.45);
+            binUnderRight = hidFor->FindBin(0.65);
+        }
+        undereve = hidFor->GetBinContent(binUnderLeft); // apart from stat. fluctuations this is correct
+        width = hidFor->GetRMS()/sqrt(2.);
+//            yield  = (hidFor->GetBinContent( hidFor->FindBin(0.0) ) -undereve ) * width/2.;
+        yield = hidFor->Integral(hidFor->FindBin(0.0), hidFor->FindBin(width))-undereve;
+//            if(fHistType==1) yield=2.0*yield; // phi is not flipped
+
+        ffit->SetParameters( undereve, yield, width, 1.9 );
+        //ffit->SetParLimits( 0, 0, 1e9 );
+        //ffit->SetParLimits( 1, 0, 1e9 );
+        //ffit->SetParLimits( 2, 0, 2.);
+        //ffit->SetParLimits( 3, 1.1, 3. );
+
+        //ffit->FixParameter(3, 2.);
+
+        if( fIsGauss ) {
+            myName = "Gauss+const. (small range)";
+            ffit->FixParameter(3, 2.);
+        }
+    }
+
     /*
      * Initialize one generalized gaussian + flow
      */
@@ -814,6 +891,9 @@ public:
         fconst->SetParameter(0, ffit->GetParameter(0) );
         return fconst;
     }
+    //double GetConst() { return ffit->GetParameter(0); }
+    double GetConstErr() { return ffit->GetParError(0); }
+    double GetConfErr() { return hDEtaErr->GetBinError(hDEtaErr->FindBin(1.55)); }
 
 
     /*
@@ -1012,7 +1092,7 @@ public:
         //ffit->SetParLimits(0, 0, 1e9);
         //ffit->SetParLimits(1, 0, 10);
         ffit->SetParLimits(2, 0.01, 10);
-    };
+    }
     /*
      * Initialize QGaussian + const
      */
