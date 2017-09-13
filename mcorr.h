@@ -1,13 +1,11 @@
 #ifndef MCORR_H
 #define MCORR_H
 
-/*
- * ***************************************************************************
- * This macro compares our results to published
+/* ***************************************************************************
+ * This macro to extract I_{AA} vs. delta eta and p_{T,assoc} from ALICE data.
+ * It also compares our results to published
  * http://hepdata.cedar.ac.uk/view/ins930312
- * correction in vertex bins can be chosen
- * ***************************************************************************
- */
+ * **************************************************************************/
 
 #include <TString.h>
 #include <TFitResultPtr.h>
@@ -15,6 +13,11 @@
 #include <iostream>
 #include <fstream>
 #include <typeinfo>
+#include <TVirtualFitter.h>
+
+#include <sys/stat.h>
+#include <unistd.h>
+#include <string>
 
 #include "AliJHistManagerROOT6.cxx"
 #include "mfit.h"
@@ -24,71 +27,75 @@
 
 enum kType { kPP, kPbPb };
 
-
 class MCorr
 {
     private:
         // info strings related to I/O:
-        int fMCorrCount;
-        int fType;            // 0=pp, 1=PbPb
-        TString fTypeName;    // pp, PbPb
-        TString fInFileName;  // name of JCORRAN input file (assuming dir: ../data/jcorran)
-        TString fOutFileName; // output ROOT file name (generated in WriteOutput() )
-        TFile * fInFile, * fOutFile;      //
-        TString fTrackCut;    // name of track cut
+        int fMCorrCount;        // class index
+        int fType;              // 0=pp, 1=PbPb
+        int fResonance;         // 0: no resonance cut (e.g. merge with hResonanceCut), 1: resonance cut
+
+        bool fLoadedDEtaDPhi, fProjectedDEtaDPhi, fFittedDEta, fFittedDPhi;
+        bool fVertexCorr, fWingCorr;
+
+		double fFitRange;
 
         double fsumAssocBinsForMixAbove;
         double fsumTriggBinsForMixAbove;
 
         double fNTrigg[6][15]; // C, T
-        double fNTrigg_noVCut[6][15]; // C, T (no vertex cut in phi)
+        double fNTrigg_noVCut[6][15]; // C, T (no vertex cut)
         double fNEve[6]; // C
 
-        bool fLoadedDEta, fLoadedDPhi, fLoadedDEtaDPhi, fProjectedDEtaDPhi, fFittedDEta, fFittedDPhi;
-        bool fVertexCorr;
+        TString fTypeName;    // pp, PbPb
+        TString fInFileName;  // name of JCORRAN input file (assuming dir: ../data/jcorran)
+        TString fOutFileName; // output ROOT file name (generated in WriteOutput() )
+        TString fTrackCut;    // name of track cut
+        TString fFitOpt;
 
-        int fWhichMixed; // choose mixed event correction: 0=hDEtaNearM, 1=3DMixed
+        TFile * fInFile, * fOutFile;
 
         std::vector<TString> fFitNames;
 
         MTools * mt;
 
     public:
-
         int iplot=0;
         std::vector<TH1*>    hList;
         std::vector<TString> legList;
 
-        TString fPeriod, fAOD, fRL, fComment; // string related to input file
-        // with array dimension
+        // info string related to input file
+        TString fPeriod, fAOD, fRL, fComment;
+        // with array dimensions
         const static int kT = 5, // PTt
-              kA = 10,    // PTa
-              kC = 5,     // Cent
-              kV = 30,    // Vertex
-              kF = 2,     // Fit functions (Gauss+Gen.Gauss)
-              kS = 3;     // Subtracion method
+              kA = 7,            // PTa
+              kC = 5,            // Cent
+              kV = 11,           // Vertex
+              kF = 3;            // Fit functions (Gauss+Gen.Gauss+SmallRangeGauss)
 
         // various cuts (-1 is all):
         double fPhiCut, fEtaCut, fVertexCut;
+
         // hist manager and histos from input file
         AliJHistManager * fhst;
-        AliJTH1D fhDEtaNearRaw, fhDEtaNearMix, fhTriggPt, fhZVert, fhDphiAssoc;
+        AliJTH1D fhDEtaNearRaw, fhDEtaNearMix, fhTriggPt, fhZVert;
         AliJTH1D fhChargedPt, fhiCentr, fhCentr, fhIetaTrigg, fhIetaAssoc, fhIphiTrigg, fhIphiAssoc;
-        AliJTH2D fhDphiDetaPta;
+        AliJTProfile fhTrackingEff;
+        AliJTH2D fhDphiDetaPta, fhResonanceCut;
         //AliJTH1D fhDEtaNear2D, fhDEtaNearFar2D, fhDPhiNear2D, fhDPhiFar2D;
         AliJBin *fCent, *fVtx, *fPTt, *fPTa, *fEta, *fPhi;
 
         // AliJBin indices:
         int fNumPhi, fNumEta, fNumPta, fNumPtt, fNumVtx, fNumCent;
         int fMinPTtBin, fMaxPTtBin;
-        double fMinPTt, fMaxPTt;
         int fVertexSkip, fPhiSkip, fEtaSkip;
+        double fMinPTt, fMaxPTt;
 
         // correction coming from different mixed event correction:
         // Filip: range/hMix->Integral(), so average is around 1
         // Ours:  1./hMix->GetBinContent() at (0,0), so hMix is efficiency correction,
         // and its maximum should be <= 1
-        double fFilipCorr_eta[kC][kT][kA];
+        // double fFilipCorr_eta[kC][kT][kA];
 
         // HISTOGRAM DEFINITIONS:
 
@@ -98,113 +105,90 @@ class MCorr
         // fit results
         THashList * FitResultsEta;
 
-        // histos for DEta
-        TH1D * hDEtaRaw[kC][kT][kA],
-             * hDEtaMix[kC][kT][kA],
-             * hDEtaReal[kC][kT][kA],
-             * hDEtaRealFlip[kC][kT][kA],
-             * hDEtaSig[kF][kC][kT][kA],
-             * hDEtaSig2D[kF][kC][kT][kA],
-             * hDEtaRawVtx[kC][kV][kT][kA],
-             * hDEtaMixVtx[kC][kV][kT][kA],
-             * hDEtaRealVtx[kC][kV][kT][kA],
-             * hDEtaMixVtxTmp[kC][kV][kT][kA],
-             * hDEtaRaw2D[kC][kT][kA],
+		// histos for DEta
+        //TH1D * hDEtaRaw[kC][kT][kA],
+        TH1D * hDEtaRaw2D[kC][kT][kA],
+        // * hDEtaMix[kC][kT][kA],
              * hDEtaMix2D[kC][kT][kA],
+             * hDEtaReal[kC][kT][kA],
              * hDEtaReal2D[kC][kT][kA],
-             * hDEtaReal2DFlip[kC][kT][kA],
-             * hDEtaReal2Dmixed1D[kC][kT][kA],
-             * hDEtaRaw2DRcut[kC][kT][kA],
-             * hDEtaMix2DRcut[kC][kT][kA],
-             * hDEtaReal2DRcut[kC][kT][kA],
-             * hDEtaRaw2DFar[kC][kT][kA],
-             * hDEtaMix2DFar[kC][kT][kA],
+             * hDEtaRealFlip[kC][kT][kA],
+             * hDEtaRealFlip2D[kC][kT][kA],
+             * hDEtaRealFlipErr[kF][kC][kT][kA],
+             * hDEtaRealFlipErr2D[kF][kC][kT][kA],
+             * hDEtaSig1D[kF][kC][kT][kA],
+             * hDEtaSig2D[kF][kC][kT][kA],
              * hDEtaReal2DFar[kC][kT][kA];
 
-        // histos for DPhi
-        // [Eta<1, Eta>1, subtracted], C, T, A
-        TH1D * hDPhiRaw[2][kC][kT][kA],
-             * hDPhiMix[2][kC][kT][kA],
-             * hDPhiReal[3][kC][kT][kA],
-             * hDPhiRaw2D[2][kC][kT][kA],
-             * hDPhiMix2D[2][kC][kT][kA],
-             * hDPhiReal2D[3][kC][kT][kA],
-             * hDPhiReal2Dmixed1D[3][kC][kT][kA],
-             * hDPhiRaw2DRcut[2][kC][kT][kA],
-             * hDPhiMix2DRcut[2][kC][kT][kA],
-             * hDPhiReal2DRcut[3][kC][kT][kA];
-
-        TH2D * hDEtaDPhiRaw[kC][kT][kA],
-             * hDEtaDPhiMix[kC][kT][kA],
+		TH2D * hDEtaDPhiRaw[kC][kT][kA],
+			 * hDEtaDPhiMix[kC][kT][kA],
              * hDEtaDPhiReal[kC][kT][kA];
 
-        TH1D * hDEtaWingCorr[kC][kT][kA];
+        //TH1D * hDEtaWingCorr[kC][kT][kA];
 
         TH1D * hChargedPtPub[kC]; // publised inclusive p_t
-        //TH1D * hTrackingEff[kC];  // tracking efficiency
 
         // fit functions
-        MFit * mfit_eta_1d[kF][kC][kT][kA],
-             * mfit_eta_2d[kF][kC][kT][kA],
-             * mfit_phi_gc[kC][kT][kA][kS],
-             * mfit_phi_ggc[kC][kT][kA][kS],
-             * mfit_phi_kc[kC][kT][kA][kS],
-             * mfit_phi_cc[kC][kT][kA][kS],
-             * mfit_phi_qgc[kC][kT][kA][kS];
+		MFit * mfit_eta_1d[kF][kC][kT][kA],
+			 * mfit_eta_2d[kF][kC][kT][kA];
 
         // DEFAULT CONSTRUCTOR
         MCorr() :
             fMCorrCount(0),
             fType(-1),
+            fResonance(0),
+            fLoadedDEtaDPhi(false),
+            fProjectedDEtaDPhi(false),
+            fFittedDEta(false),
+            fFittedDPhi(false),
+            fVertexCorr(false),
+            fWingCorr(false),
+            fFitRange(0),
+            fsumTriggBinsForMixAbove(6.), // same as Filip
+            fsumAssocBinsForMixAbove(4.), // same as Filip
+            fPhiCut(0.0),
+            fEtaCut(0.0),
+            fVertexCut(0.0),
+            fMinPTt(-1),
+            fMaxPTt(-1),
             fInFileName(""),
             fPeriod(""),
             fAOD(""),
             fRL(""),
             fComment(""),
             fTrackCut(""),
-            fPhiCut(0.0),
-            fEtaCut(0.0),
-            fVertexCut(0.0),
-            fVertexCorr(false),
-            fMinPTt(-1),
-            fMaxPTt(-1),
-            fWhichMixed(0),
-            fLoadedDEta(false),
-            fLoadedDPhi(false),
-            fLoadedDEtaDPhi(false),
-            fProjectedDEtaDPhi(false),
-            fFittedDEta(false),
-            fFittedDPhi(false)
+            fTypeName("NOTYPE")
         {
             // default const.
+			mt = new MTools();
         }
 
         // CONSTRUCTOR
         MCorr(int imcorr, int itype, TString inname, TString per, TString aod, TString rl, TString comment,
-                TString tcut, double phicut, double etacut, double vertexcut, double minptt, double maxptt, int imix, bool vcorr) :
+                TString tcut, double phicut, double etacut, double vertexcut, double minptt, double maxptt, int ires, bool vcorr, bool wcorr) :
             fMCorrCount(imcorr),
             fType(itype),
+            fResonance(ires),
+            fLoadedDEtaDPhi(false),
+            fProjectedDEtaDPhi(false),
+            fFittedDEta(false),
+            fFittedDPhi(false),
+            fVertexCorr(vcorr),
+            fWingCorr(wcorr),
+            fFitRange(0),
+            fsumTriggBinsForMixAbove(6.), // same as Filip
+            fsumAssocBinsForMixAbove(4.), // same as Filip
+            fPhiCut(phicut),
+            fEtaCut(etacut),
+            fVertexCut(vertexcut),
+            fMinPTt(minptt),
+            fMaxPTt(maxptt),
             fInFileName(inname),
             fPeriod(per),
             fAOD(aod),
             fRL(rl),
             fComment(comment),
-            fTrackCut(tcut),
-            fPhiCut(phicut),
-            fEtaCut(etacut),
-            fVertexCut(vertexcut),
-            fVertexCorr(vcorr),
-            fMinPTt(minptt),
-            fMaxPTt(maxptt),
-            fWhichMixed(imix),
-            fLoadedDEta(false),
-            fLoadedDPhi(false),
-            fLoadedDEtaDPhi(false),
-            fProjectedDEtaDPhi(false),
-            fFittedDEta(false),
-            fFittedDPhi(false),
-            fsumTriggBinsForMixAbove(6.), // same as Filip
-            fsumAssocBinsForMixAbove(4.) // same as Filip
+            fTrackCut(tcut)
         {
             switch(fType)
             {
@@ -214,10 +198,12 @@ class MCorr
             }
 
             mt = new MTools();
+            //TH1::SetDefaultSumw2(false);
 
         }
 
         // COPY CONSTRUCTOR
+        // TODO: fix order
         MCorr(const MCorr& obj) :
             fMCorrCount(obj.fMCorrCount),
             fType(obj.fType),
@@ -231,11 +217,11 @@ class MCorr
             fEtaCut(obj.fEtaCut),
             fVertexCut(obj.fVertexCut),
             fVertexCorr(obj.fVertexCorr),
+            fWingCorr(obj.fWingCorr),
+			fFitRange(obj.fFitRange),
             fMinPTt(obj.fMinPTt),
             fMaxPTt(obj.fMaxPTt),
-            fWhichMixed(obj.fWhichMixed),
-            fLoadedDEta(obj.fLoadedDEta),
-            fLoadedDPhi(obj.fLoadedDPhi),
+            fResonance(obj.fResonance),
             fLoadedDEtaDPhi(obj.fLoadedDEtaDPhi),
             fProjectedDEtaDPhi(obj.fProjectedDEtaDPhi),
             fFittedDEta(obj.fFittedDEta),
@@ -252,8 +238,7 @@ class MCorr
 
             LoadNtriggers();
 
-            //CreateOutHistos();
-
+            if(fType==kPP) {fsumTriggBinsForMixAbove=4; fsumAssocBinsForMixAbove=3;}
             std::cout <<"\n"<< Form("MCorr %d initialization done... \n",fMCorrCount);
         }
 
@@ -261,29 +246,19 @@ class MCorr
         {
             std::cout << "LoadInputFile()\n";
 
-            TString jdir = "../data/jcorran/";
             fInFile = TFile::Open( fInFileName );
             fInFile->cd();
 
             fhst = new AliJHistManager( "hst" );
+			fhst->LoadConfig( Form("JDiHadronIAA_%s/AliJHistos", fTrackCut.Data()) );
 
-            if( -1 != fhst->LoadConfig( Form("JDiHadronCorr_%s/AliJHistos", fTrackCut.Data()) ) ) {
-                fhst->LoadConfig( Form("JDiHadronCorr_%s/AliJHistos", fTrackCut.Data()) );
-            }
-            else if( -1 != fhst->LoadConfig( Form("JDiHadronIAA_%s/AliJHistos", fTrackCut.Data()) ) ) {
-                fhst->LoadConfig( Form("JDiHadronIAA_%s/AliJHistos", fTrackCut.Data()) );
-            }
-
-            fhDEtaNearRaw = fhst->GetTH1D("hDEtaNear");   //!        // 5D: C, V, E, T, A
-            if( fWhichMixed==0 ) fhDEtaNearMix = fhst->GetTH1D("hDEtaNearM");  //!            // 5D: C, V, E, T, A
-            if( fWhichMixed==1 ) fhDEtaNearMix = fhst->GetTH1D("hDEtaNearMixAcceptance");  //!        // 4D: C, V, T, A
             fhTriggPt     = fhst->GetTH1D("hTriggPtBin"); //!        // 3D: C, V, T
             fhZVert       = fhst->GetTH1D("hZVert");      //!        // 1D: C
-            fhDphiAssoc   = fhst->GetTH1D("hDphiAssoc");  //!        // 5D: D, C, E, T, A
             fhDphiDetaPta = fhst->GetTH2D("hDphiDetaPta"); //!      // 4D: D, C, T, A
+			if(fResonance==0) fhResonanceCut = fhst->GetTH2D("hResonanceCut"); //!      // 4D: D, C, T, A
 
-            fhChargedPt = fhst->GetTH1D("hChargedPt");   //! // 1D: C
-            //fhTrackingEff = fhst->GetTH1D("hTrackingEff");   //! // 1D: C
+			fhChargedPt = fhst->GetTH1D("hChargedPt");   //! // 1D: C
+            fhTrackingEff = fhst->GetTProfile("hTrackingEff");   //! // 1D: C
             fhiCentr    = fhst->GetTH1D("hiCentr");      //! // 0D
             fhCentr     = fhst->GetTH1D("hCentr");       //! // 0D
             fhIetaTrigg = fhst->GetTH1D("hIetaTrigg");   //! // 2D: C, T
@@ -294,7 +269,7 @@ class MCorr
             fCent = fhst->GetBin("Cent");   fNumCent = fCent->Size();
             fVtx  = fhst->GetBin("Vtx");    fNumVtx  = fVtx->Size();
             fPTt  = fhst->GetBin("PTt");    fNumPtt  = fPTt->Size();
-            fPTa  = fhst->GetBin("PTa");    fNumPta  = fPTa->Size();
+            fPTa  = fhst->GetBin("PTa");    fNumPta  = fPTa->Size()-1;
             fEta  = fhst->GetBin("EtaGap"); fNumEta  = fEta->Size();
             fPhi  = fhst->GetBin("PhiGap"); fNumPhi  = fPhi->Size();
 
@@ -303,84 +278,68 @@ class MCorr
             if( fVertexCut==-1 ) fVertexCut = fVtx->At( fNumVtx );
 
             fVertexSkip = fVtx->GetBin( fVertexCut );
-            fPhiSkip    = fPhi->GetBin( fPhiCut );
-            fEtaSkip    = fEta->GetBin( fEtaCut );
+			fPhiSkip    = fPhi->GetBin( fPhiCut-0.01 )+1; // this is bin, but loop will be up to bin upper edge
+            fEtaSkip    = fEta->GetBin( fEtaCut )+1;
             fMinPTtBin  = fPTt->GetBin( fMinPTt );
             fMaxPTtBin  = fPTt->GetBin( fMaxPTt );
 
             std::cout << "LoadInputFile() done...\n";
-        }
+		}
+
 
         // DESTRUCTOR
         ~MCorr()
         {
             std::cout << "deleting MCorr instances... \n";
+
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
                 for(int ic=0; ic<fNumCent; ic++){
                     for(int ipta=0; ipta<fNumPta; ipta++){
                         if(fPTt->At(iptt) < fPTa->At(ipta))
                             continue; // PTa upper border should be smaller than PTt lower
                         // eta related histos
-                        if(fLoadedDEta){
-                            delete hDEtaRaw[ic][iptt][ipta];
-                            delete hDEtaMix[ic][iptt][ipta];
+						if(fProjectedDEtaDPhi){
+                            //delete hDEtaRaw[ic][iptt][ipta];
+                            //delete hDEtaMix[ic][iptt][ipta];
                             delete hDEtaReal[ic][iptt][ipta];
                             delete hDEtaRealFlip[ic][iptt][ipta];
-                            for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++) {
-                                delete hDEtaRawVtx[ic][iv][iptt][ipta];
-                                delete hDEtaMixVtx[ic][iv][iptt][ipta];
-                                delete hDEtaRealVtx[ic][iv][iptt][ipta];
-                            }
-                        }
-                        if(fProjectedDEtaDPhi) {
-                            delete hDEtaRaw2DFar[ic][iptt][ipta];
-                            delete hDEtaMix2DFar[ic][iptt][ipta];
+
+                            delete hDEtaRaw2D[ic][iptt][ipta];
+                            delete hDEtaMix2D[ic][iptt][ipta];
+                            delete hDEtaReal2D[ic][iptt][ipta];
+                            delete hDEtaRealFlip2D[ic][iptt][ipta];
+
                             delete hDEtaReal2DFar[ic][iptt][ipta];
-                            delete hDEtaRaw2DFar[ic][iptt][ipta];
-                            delete hDEtaMix2DFar[ic][iptt][ipta];
-                            delete hDEtaReal2DFar[ic][iptt][ipta];
+
+
                         }
+
                         if(fFittedDEta)
                         {
-
-                            //delete mfit_eta_gc[ic][iptt][ipta];
-                            //delete mfit_eta_ggc[ic][iptt][ipta];
-                            //delete mfit_eta_kc[ic][iptt][ipta];
-                            //delete mfit_eta_cc[ic][iptt][ipta];
-                            //delete mfit_eta_qgc[ic][iptt][ipta];
+                            for(int ifit=0; ifit<kF; ifit++)
+							{
+                                //delete mfit_eta_1d[ifit][ic][iptt][ipta];
+                                //delete mfit_eta_2d[ifit][ic][iptt][ipta];
+                                hDEtaSig1D[ifit][ic][iptt][ipta];
+                                hDEtaSig2D[ifit][ic][iptt][ipta];
+							}
                         }
+
                         if(fLoadedDEtaDPhi)
                         {
                             delete hDEtaDPhiRaw[ic][iptt][ipta];
                             delete hDEtaDPhiMix[ic][iptt][ipta];
                             delete hDEtaDPhiReal[ic][iptt][ipta];
                         }
-                        // phi related histos
-                        if(fLoadedDPhi){
-                            for(int ie=0; ie<2; ie++)
-                            {
-                                delete hDPhiRaw[ie][ic][iptt][ipta];
-                                delete hDPhiMix[ie][ic][iptt][ipta];
-                                delete hDPhiReal[ie][ic][iptt][ipta];
-                            }
-                            if(fFittedDPhi)
-                            {
-                                for(int isub=0; isub<kS; isub++)
-                                {
-                                    delete mfit_phi_gc[ic][iptt][ipta][isub];
-                                    delete mfit_phi_ggc[ic][iptt][ipta][isub];
-                                    delete mfit_phi_kc[ic][iptt][ipta][isub];
-                                    delete mfit_phi_cc[ic][iptt][ipta][isub];
-                                    delete mfit_phi_qgc[ic][iptt][ipta][isub];
-                                }
-                            }
-                        }
                     }
                 }
             }
+
+            delete fhst;
             FitResultsEta->Clear("C");
-            delete mt;
-            fInFile->Close();
+			delete FitResultsEta;
+			delete mt;
+			fInFile->Close();
         }
 
         void LoadNtriggers(){
@@ -406,24 +365,26 @@ class MCorr
 
             for(int ic=0; ic<fNumCent; ic++)
             {
+                fhiCentr[0]->Print();
                 //std::cout << endl << ic << std::endl;
                 fNEve[ic]=fhiCentr[0]->GetBinContent(ic+1);
-                //std::cout << fNEve[ic] << std::endl;
+                std::cout << "No. of events in ic " << ic << " = " << fNEve[ic] << std::endl;
                 for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
                 {
                     fNTrigg[ic][iptt]=0;
                     fNTrigg_noVCut[ic][iptt]=0;
                     hTriggVSum[ic][iptt]=(TH1D*)fhTriggPt[ic][0][iptt]->Clone(); hTriggVSum[ic][iptt]->Reset();
                     for(int iv=0; iv<fNumVtx; iv++){
-                        fNTrigg_noVCut[ic][iptt] += fhTriggPt[ic][iv][iptt]->GetEntries(); // count ntrigg without vertex cut (phi)
+						fNTrigg_noVCut[ic][iptt] += fhTriggPt[ic][iv][iptt]->Integral(); // count ntrigg without vertex cut (phi)
                         if( iv>=fVertexSkip && iv<(fNumVtx-fVertexSkip) )
                         {
                             hTriggVSum[ic][iptt]->Add( fhTriggPt[ic][iv][iptt] );
-                            fNTrigg[ic][iptt] += fhTriggPt[ic][iv][iptt]->GetEntries(); // count ntrigg with vertex cut (eta)
+							fNTrigg[ic][iptt] += fhTriggPt[ic][iv][iptt]->Integral(); // count ntrigg with vertex cut (eta)
                         }
                     }
                 }
             }
+
             double nevents = 0;
             for(int ic=0; ic<fNumCent; ic++) {
                 outF <<  "  & " << fhst->GetBin("Cent")->BuildTitle(ic);
@@ -437,6 +398,7 @@ class MCorr
                 for(int ic=0; ic<fNumCent; ic++)
                     outF << " &" << fNTrigg[ic][iptt];
             }
+            outF.close();
             std::cout << "LoadNtriggers() done...\n";
 
         }
@@ -456,7 +418,7 @@ class MCorr
             for(int ic=0;ic<fNumCent;ic++) noeve += fNEve[ic];
 
             //plot centrality "centrality[%]","counts",
-            MPlot * mcentr = new MPlot(iplot++, "centrality[%]", "counts", false);
+			MPlot * mcentr = new MPlot(iplot++, "centrality[%]", "counts", false);
             hList = { fhCentr[0] };
             legList={ Form("%.2f M",fhCentr[0]->Integral()/1000000.) };
 
@@ -558,18 +520,24 @@ class MCorr
             std::cout << "DrawInclPt()\n";
 
             const double dEta = fEta->At(fNumEta) - fEta->At(0);
+            std::cout << "DETA=" <<dEta <<std::endl;
+
             TString title = "";
             for(int ic=0; ic<fNumCent; ic++)
             {
                 MPlot * mptt = new MPlot(iplot++, "p_{T}", "1/N_{eve} 1/(2#pip_{T}|#Delta#eta|) dN/dp_{T} [ (GeV/c)^{-2} ]", true);
                 mptt->AddInfo( BuildInfo() );
-                mt->DivideWithX( fhChargedPt[ic] ); // correcting with 1/p_T
+                mptt->SetRatioFit(0, true, 0.6, 30);
+                //fhChargedPt[ic]->Rebin(2); fhChargedPt[ic]->Scale(1./2.);
                 fhChargedPt[ic]->Scale(1./2./TMath::Pi()/dEta/fNEve[ic], "width");
+                mt->DivideWithX( fhChargedPt[ic] ); // correcting with 1/p_T
+
+                //fhChargedPt[ic]->Multiply(fhTrackingEff[ic]);
                 hList  = { hChargedPtPub[ic], fhChargedPt[ic] };
                 if(fType==kPP) {
                     title = "arxiv:1307.1093";
                     fhChargedPt[ic]->Scale(62.2); // published data is Ed^3sigma/dp, so scaling with sigma
-                    //fhChargedPt[ic]->Scale(0.7); // trigger efficiency for TPCOnly
+                    fhChargedPt[ic]->Scale(0.88); // trigger efficiency for TPCOnly
                 }
                 else if(fType==kPbPb) {
                     title = "arxiv:1208.2711";
@@ -579,12 +547,11 @@ class MCorr
                 legList ={ title, "this analysis" };
                 mptt->addHList(hList, legList);
 
-                mptt->SetLimitsXY(0.6, 30, 1E-6, 1E4);
-                mptt->SetRatioLimitsXY(0.6, 30., 0, 2);
+				mptt->SetLimitsXY(0.6, 30, 1E-9, 1E4);
+                mptt->SetRatioLimitsXY(0.6, 30., 0.8, 1.2);
                 mptt->SetLog(true, true);
                 mptt->Draw();
                 mptt->Save( Form("../figs/QA/incl_pt_%s_C%d",fTypeName.Data(), ic));
-
             }
         }
 
@@ -609,104 +576,28 @@ class MCorr
                 case kPP:
                     infile = TFile::Open("../data/published/ALICEppReference2760.root");
                     hChargedPtPub[0] = (TH1D*) infile->Get("h8462_d1x1y2");
-                    hChargedPtPub[0]->Print();
+                    //hChargedPtPub[0]->Print();
                     break;
             }
             std::cout << "GetPublishedInclPt() done...\n";
         }
+		double GetNoEvents(int ic) {return fNEve[ic]; }
 
-        void LoadDPhiHistos()
+		TString GetNotUniqueCTA(int ic, int iptt, int ipta)
+		{
+			return Form("%s_C%dT%dA%d",fTypeName.Data(),ic,iptt,ipta);
+		}
+        TString GetCA(int ic, int ipta)
         {
-            std::cout << "MCorr::LoadDPhiHistos()...\n";
-
-            const int ipta_mixed = fPTa->GetBin(3.);
-            //const double dPhi = 1.;
-            double scaleMix = 1;
-            //double dEtaGapWidth = fEta->At(1)-fEta->At(0);
-            TString cta;
-            //TH1D * htmp = nullptr;
-            //TH1 * htmp_mix = nullptr;
-
-            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
-                for(int ic=0; ic<fNumCent; ic++){
-                    for(int ipta=0; ipta<fNumPta; ipta++){
-                        if(fPTt->At(iptt) < fPTa->At(ipta))
-                            continue; // PTa upper border should be smaller than PTt lower
-
-                        cta = Form("C%.0fT%.0fA%.0f",fCent->At(ic),fPTt->At(iptt),fPTa->At(ipta));
-                        for(int etagap=0; etagap<2; etagap++)
-                        {
-                            hDPhiRaw[etagap][ic][iptt][ipta] = (TH1D*)fhDphiAssoc[0][ic][0][iptt][ipta]->Clone(Form("hDPhiRaw_E0%d%s",etagap,cta.Data()));
-                            hDPhiMix[etagap][ic][iptt][ipta] = (TH1D*)fhDphiAssoc[1][ic][0][iptt][ipta]->Clone(Form("hDPhiMix_E0%d%s",etagap,cta.Data()));
-                            hDPhiReal[etagap][ic][iptt][ipta] = (TH1D*)hDPhiRaw[etagap][ic][iptt][ipta]->Clone(Form("hDPhiReal_E0%d%s",etagap,cta.Data()));
-                            hDPhiRaw[etagap][ic][iptt][ipta]->Reset();
-                            hDPhiMix[etagap][ic][iptt][ipta]->Reset();
-                            hDPhiReal[etagap][ic][iptt][ipta]->Reset();
-                        }
-                        for(int ie=0; ie<fNumEta; ie++)
-                        {
-                            if(fEta->At(ie+1) <= fEtaCut)
-                            {
-                                hDPhiRaw[0][ic][iptt][ipta]->Add(fhDphiAssoc[0][ic][ie][iptt][ipta]);
-                                hDPhiMix[0][ic][iptt][ipta]->Add(fhDphiAssoc[1][ic][ie][iptt][ipta]);
-                            }
-                            if(fEta->At(ie) >= fEtaCut )
-                            {
-                                hDPhiRaw[1][ic][iptt][ipta]->Add(fhDphiAssoc[0][ic][ie][iptt][ipta]);
-                                hDPhiMix[1][ic][iptt][ipta]->Add(fhDphiAssoc[1][ic][ie][iptt][ipta]);
-                            }
-                        }
-                        // correcting with mixed event after the summation of etagap bins
-                        for(int ie=0; ie<2; ie++)
-                        {
-                            //scaleMix = 2./hDPhiMix[ie][ic][iptt][ipta]->Integral();
-                            //int binAtZero = hDPhiMix[0][ic][iptt][ipta]->FindBin(0.);
-                            //scaleMix = hDPhiMix[0][ic][iptt][ipta]->GetBinContent( binAtZero );
-                            scaleMix = 1./( mt->GetMixedNorm1D( hDPhiMix[ie][ic][iptt][ipta]) );
-
-                            hDPhiMix[ie][ic][iptt][ipta]->Scale( scaleMix );
-                            hDPhiReal[ie][ic][iptt][ipta]->Add( hDPhiRaw[ie][ic][iptt][ipta] );
-                            if(ipta > ipta_mixed) { hDPhiReal[ie][ic][iptt][ipta]->Divide( hDPhiMix[ie][ic][iptt][ipta_mixed] ); }
-                            else                  { hDPhiReal[ie][ic][iptt][ipta]->Divide( hDPhiMix[ie][ic][iptt][ipta] ); }
-
-                        }
-
-
-                        // amekkora range-ben veszem, azzal el kell osztani
-
-//                        std::cout << "DEBUG_PHIBIN" << "\t"<< fEta->At(fEtaSkip) << "\t" << fEta->At(fNumEta) << std::endl;
-//                        if( fEtaCut!=fNumEta ) {
-//                            hDPhiRaw[1][ic][iptt][ipta]->Scale( 2*(fEta->At(fEtaSkip)/(fEta->At(fNumEta-1)-fEta->At(fEtaSkip)) ));
-//                            hDPhiReal[1][ic][iptt][ipta]->Scale( 2*(fEta->At(fEtaSkip)/(fEta->At(fNumEta-1)-fEta->At(fEtaSkip)) ));
-//                        }
-                    }
-                    for(int ipta=0; ipta<fNumPta; ipta++)
-                    {
-                        if(fPTt->At(iptt) < fPTa->At(ipta))
-                            continue; // PTa upper border should be smaller than PTt lower
-
-                        for(int etagap=0; etagap<2; etagap++)
-                        {
-                            hDPhiRaw[etagap][ic][iptt][ipta]->Scale( 1./fNTrigg_noVCut[ic][iptt], "width" );
-                            hDPhiReal[etagap][ic][iptt][ipta]->Scale( 1./fNTrigg_noVCut[ic][iptt], "width" );
-                            //hDPhiReal[etagap][ic][iptt][ipta]->Rebin(2); hDPhiReal[etagap][ic][iptt][ipta]->Scale(1./2.);
-                        }
-
-                        // slightly shift large etagap histo to signal's tail
-                        // mt->shiftToThisTail(hDPhiReal[1][ic][iptt][ipta], hDPhiReal[0][ic][iptt][ipta], 0.5, 1.4);
-                        // save etagap background as the 3rd index
-                        hDPhiReal[2][ic][iptt][ipta] = (TH1D*) hDPhiReal[0][ic][iptt][ipta]->Clone(Form("hDPhiReal_E02%s",cta.Data()));
-                        hDPhiReal[2][ic][iptt][ipta]->Add(hDPhiReal[1][ic][iptt][ipta], -1.);
-                    }
-                }
-            }
-            delete mt;
-            fLoadedDPhi=true;
+            return Form("%s_C%dA%d_count%d",fTypeName.Data(),ic,ipta,fMCorrCount);
+        }
+        TString GetCT(int ic, int iptt)
+        {
+            return Form("%s_C%dT%d_count%d",fTypeName.Data(),ic,iptt,fMCorrCount);
         }
 
         TString GetCTA(int ic, int iptt, int ipta)
         {
-            //return Form("%s_C%dT%dA%d",fTypeName.Data(),ic,iptt,ipta);
             return Form("%s_C%dT%dA%d_count%d",fTypeName.Data(),ic,iptt,ipta,fMCorrCount);
         }
 
@@ -717,17 +608,79 @@ class MCorr
         }
 
 
-
         void LoadDEtaDPhi()
         {
-            std::cout << "MCorr::LoadDEtaDPhi()...\n";
+            if(fType==0) LoadDEtaDPhi_CombinePtAbove();
+            if(fType==1) LoadDEtaDPhi_CombinePtAbove();
 
-            double scaleMix = 1.;
+        }
+
+        void LoadDEtaDPhi_PP()
+        {
+            std::cout << "MCorr::LoadDEtaDPhi_PP()...\n";
+
+            int ic = 0;
+            double deta = fEta->At(fNumEta);
             TString cta = "";
             TString newname = "";
-            TH2D * htmp[2][5][10][10][10];
             TH2D * htmp_raw = nullptr;
-            TH2D * htmp_mix = nullptr;
+            TH2D * htmp[2][10][10][10]; // DVTA
+            TH2D * htmp_mix[10]; // for pp only vertex dependence, rest is summed
+            TH2D * htmp_mixall = nullptr;
+
+            for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+            {
+                htmp_mix[iv] = (TH2D*) fhDphiDetaPta[1][0][iv][0][0]->Clone(Form("hmix_pp_tmp_V%d",iv));
+                htmp_mix[iv]->RebinX(2);
+                htmp_mix[iv]->Reset();
+            }
+            htmp_mixall = (TH2D*) fhDphiDetaPta[1][0][fVertexSkip][0][0]->Clone("hmixall_pp_tmp");
+            htmp_mixall->RebinX(2);
+            htmp_mixall->Reset();
+
+            // load raw and mixed into htmp
+            // then create empty histos for raw/mixed/real
+            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
+            {
+                for(int ipta=0; ipta<fNumPta; ipta++)
+                {
+                    if(fPTt->At(iptt) < fPTa->At(ipta))
+                        continue; // PTa upper border should be smaller than PTt lower
+
+                    for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+                    {
+
+                        for(int itype=0; itype<2; itype++)
+                        {
+                            newname = Form("%s_tmp",fhDphiDetaPta[itype][ic][iv][iptt][ipta]->GetName());
+                            htmp[itype][iv][iptt][ipta] = (TH2D*) fhDphiDetaPta[itype][ic][iv][iptt][ipta]->Clone(newname);
+                            // restore original without resonance cut
+                            if(fResonance==0)
+                                htmp[itype][iv][iptt][ipta]->Add(fhResonanceCut[itype][ic][iv][iptt][ipta]);
+                            htmp[itype][iv][iptt][ipta]->RebinX(2);
+                            htmp[itype][iv][iptt][ipta]->Scale(1./2.);
+                        }
+                        htmp_mix[iv]->Add( htmp[1][iv][iptt][ipta] );
+
+                    }
+                    cta = GetCTA(ic,iptt,ipta);
+                    hDEtaDPhiRaw[ic][iptt][ipta]  = (TH2D*) htmp[0][fVertexSkip][iptt][ipta]->Clone(Form("hDEtaDPhiRaw_%s",cta.Data()));
+                    hDEtaDPhiMix[ic][iptt][ipta]  = (TH2D*) htmp[1][fVertexSkip][iptt][ipta]->Clone(Form("hDEtaDPhiMix_%s",cta.Data()));
+                    hDEtaDPhiReal[ic][iptt][ipta] = (TH2D*) htmp[0][fVertexSkip][iptt][ipta]->Clone(Form("hDEtaDPhiReal_%s",cta.Data()));
+                    hDEtaDPhiRaw[ic][iptt][ipta]->Reset();
+                    hDEtaDPhiMix[ic][iptt][ipta]->Reset();
+                    hDEtaDPhiReal[ic][iptt][ipta]->Reset();
+
+                }
+            }
+
+
+            for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+            {
+                htmp_mixall->Add(htmp_mix[iv]);
+                htmp_mix[iv]->Scale(1./mt->GetMixedNorm2D(htmp_mix[iv], deta));
+            }
+            htmp_mixall->Scale(1./mt->GetMixedNorm2D(htmp_mixall, deta));
 
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
             {
@@ -740,26 +693,88 @@ class MCorr
                     {
                         for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
                         {
+                            // Add raw correlation
+                            hDEtaDPhiRaw[ic][iptt][ipta]->Add( htmp[0][iv][iptt][ipta] );
+                            hDEtaDPhiMix[ic][iptt][ipta]->Add( htmp[1][iv][iptt][ipta] );
+                        }
+                        // Correct with mixed in vertex bins if requested
+                        if(fVertexCorr)
+                        {
+                            for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+                            {
+                                htmp_raw = (TH2D*) htmp[0][iv][iptt][ipta]->Clone(Form("%s_tmp_%d",htmp[0][iv][iptt][ipta]->GetName(),fMCorrCount));
+                                htmp_raw->Divide(htmp_mix[iv]);
+                                hDEtaDPhiReal[ic][iptt][ipta]->Add( htmp_raw );
+                            }
+                        }
+                        else
+                        {
+                            hDEtaDPhiReal[ic][iptt][ipta]->Add( hDEtaDPhiRaw[ic][iptt][ipta] );
+                            hDEtaDPhiReal[ic][iptt][ipta]->Divide( htmp_mixall );
+                        }
+                        hDEtaDPhiReal[ic][iptt][ipta]->Scale( 1./fNTrigg[ic][iptt], "width" );
+                    }
+                }
+            }
+            fLoadedDEtaDPhi=true;
+        }
+
+
+
+
+
+        void LoadDEtaDPhi_AA()
+        {
+            std::cout << "MCorr::LoadDEtaDPhi_PP()...\n";
+
+            double deta = fEta->At(fNumEta);
+            TString cta = "";
+            TString newname = "";
+            TH2D * htmp_raw = nullptr;
+            TH2D * htmp[2][5][10][10][10]; // DCVTA
+            TH2D * htmp_mix[5][10]; // for PbPb vertex and centrality dependence, rest is summed
+            TH2D * htmp_mixall[5];;
+
+            for(int ic=0; ic<fNumCent; ic++)
+            {
+                for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+                {
+                    htmp_mix[ic][iv] = (TH2D*) fhDphiDetaPta[1][ic][iv][0][0]->Clone(Form("hmix_T%d_tmp_C%dV%d",fType,ic,iv));
+                    htmp_mix[ic][iv]->RebinX(2);
+                    htmp_mix[ic][iv]->Reset();
+                }
+
+                htmp_mixall[ic] = (TH2D*) fhDphiDetaPta[1][ic][fVertexSkip][0][0]->Clone(Form("hmixall_T%d_tmp_C%d",fType,ic));
+                htmp_mixall[ic]->RebinX(2);
+                htmp_mixall[ic]->Reset();
+            }
+
+            // load raw and mixed into htmp
+            // then create empty histos for raw/mixed/real
+            for(int ic=0; ic<fNumCent; ic++)
+            {
+                for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
+                {
+                    for(int ipta=0; ipta<fNumPta; ipta++)
+                    {
+                        if(fPTt->At(iptt) < fPTa->At(ipta))
+                            continue; // PTa upper border should be smaller than PTt lower
+
+                        for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+                        {
                             for(int itype=0; itype<2; itype++)
                             {
                                 newname = Form("%s_tmp",fhDphiDetaPta[itype][ic][iv][iptt][ipta]->GetName());
                                 htmp[itype][ic][iv][iptt][ipta] = (TH2D*) fhDphiDetaPta[itype][ic][iv][iptt][ipta]->Clone(newname);
+                                // restore original without resonance cut
+                                if(fResonance==0)
+                                    htmp[itype][ic][iv][iptt][ipta]->Add(fhResonanceCut[itype][ic][iv][iptt][ipta]);
                                 htmp[itype][ic][iv][iptt][ipta]->RebinX(2);
+                                htmp[itype][ic][iv][iptt][ipta]->Scale(1./2.);
                             }
+                            htmp_mix[ic][iv]->Add( htmp[1][ic][iv][iptt][ipta] );
+
                         }
-                    }
-                }
-            }
-
-            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
-            {
-                for(int ipta=0; ipta<fNumPta; ipta++)
-                {
-                    if(fPTt->At(iptt) < fPTa->At(ipta))
-                        continue; // PTa upper border should be smaller than PTt lower
-
-                    for(int ic=0; ic<fNumCent; ic++)
-                    {
                         cta = GetCTA(ic,iptt,ipta);
                         hDEtaDPhiRaw[ic][iptt][ipta]  = (TH2D*) htmp[0][ic][fVertexSkip][iptt][ipta]->Clone(Form("hDEtaDPhiRaw_%s",cta.Data()));
                         hDEtaDPhiMix[ic][iptt][ipta]  = (TH2D*) htmp[1][ic][fVertexSkip][iptt][ipta]->Clone(Form("hDEtaDPhiMix_%s",cta.Data()));
@@ -768,26 +783,151 @@ class MCorr
                         hDEtaDPhiMix[ic][iptt][ipta]->Reset();
                         hDEtaDPhiReal[ic][iptt][ipta]->Reset();
 
+                    }
+                }
+            }
+            for(int ic=0; ic<fNumCent; ic++)
+            {
+                for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+                {
+                    htmp_mixall[ic]->Add(htmp_mix[ic][iv]);
+                    htmp_mix[ic][iv]->Scale(1./mt->GetMixedNorm2D(htmp_mix[ic][iv], deta));
+                }
 
+                htmp_mixall[ic]->Scale(1./mt->GetMixedNorm2D(htmp_mixall[ic], deta));
+
+                for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
+                {
+                    for(int ipta=0; ipta<fNumPta; ipta++)
+                    {
+                        if(fPTt->At(iptt) < fPTa->At(ipta))
+                            continue; // PTa upper border should be smaller than PTt lower
+
+                        for(int ic=0; ic<fNumCent; ic++)
+                        {
+                            for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+                            {
+                                // Add raw correlation
+                                hDEtaDPhiRaw[ic][iptt][ipta]->Add( htmp[0][ic][iv][iptt][ipta] );
+                                hDEtaDPhiMix[ic][iptt][ipta]->Add( htmp[1][ic][iv][iptt][ipta] );
+                            }
+                            // Correct with mixed in vertex bins if requested
+                            if(fVertexCorr)
+                            {
+                                for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+                                {
+                                    htmp_raw = (TH2D*) htmp[0][ic][iv][iptt][ipta]->Clone(Form("%s_tmp_%d",htmp[0][ic][iv][iptt][ipta]->GetName(),fMCorrCount));
+                                    htmp_raw->Divide(htmp_mix[ic][iv]);
+                                    hDEtaDPhiReal[ic][iptt][ipta]->Add( htmp_raw );
+                                }
+                            }
+                            else
+                            {
+                                hDEtaDPhiReal[ic][iptt][ipta]->Add( hDEtaDPhiRaw[ic][iptt][ipta] );
+                                hDEtaDPhiReal[ic][iptt][ipta]->Divide( htmp_mixall[ic] );
+                            }
+                            hDEtaDPhiReal[ic][iptt][ipta]->Scale( 1./fNTrigg[ic][iptt], "width" );
+                        }
+                    }
+                }
+            }
+            fLoadedDEtaDPhi=true;
+        }
+
+
+
+
+
+
+
+
+
+        void LoadDEtaDPhi_CombinePtAbove()
+        {
+            std::cout << "MCorr::LoadDEtaDPhi()...\n";
+
+            double scaleMix = 1.;
+            TString cta = "";
+            TString newname = "";
+            TH2D * htmp[2][5][10][10][10];
+            TH2D * htmp_raw = nullptr;
+			TH2D * htmp_mix[5][10][10][10];
+            //TH2D * hmix_pp[10];
+
+            double deta = fEta->At(fNumEta);
+
+            //TH2D * htmp_mix_pp[10]; // for pp only vertex dependence, rest is summed
+
+            const int iptt_mixed = fPTt->GetBin( fsumTriggBinsForMixAbove );
+            const int ipta_mixed = fPTa->GetBin( fsumAssocBinsForMixAbove );
+
+			// load raw and mixed into htmp
+			// then create empty histos for raw/mixed/real
+            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
+            {
+                for(int ipta=0; ipta<fNumPta; ipta++)
+                {
+                    if(fPTt->At(iptt) < fPTa->At(ipta))
+                        continue; // PTa upper border should be smaller than PTt lower
+
+                    for(int ic=0; ic<fNumCent; ic++)
+                    {
+                        for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+                        {
+							for(int itype=0; itype<2; itype++)
+                            {
+                                newname = Form("%s_T%d_tmp",fhDphiDetaPta[itype][ic][iv][iptt][ipta]->GetName(), fType);
+                                htmp[itype][ic][iv][iptt][ipta] = (TH2D*) fhDphiDetaPta[itype][ic][iv][iptt][ipta]->Clone(newname);
+								// restore original without resonance cut
+                                if(fResonance==0)
+                                    htmp[itype][ic][iv][iptt][ipta]->Add(fhResonanceCut[itype][ic][iv][iptt][ipta]);
+                                htmp[itype][ic][iv][iptt][ipta]->RebinX(2);
+                                htmp[itype][ic][iv][iptt][ipta]->Scale(1./2.);
+                            }
+                        }
+						cta = GetCTA(ic,iptt,ipta);
+						hDEtaDPhiRaw[ic][iptt][ipta]  = (TH2D*) htmp[0][ic][fVertexSkip][iptt][ipta]->Clone(Form("hDEtaDPhiRaw_%s",cta.Data()));
+						hDEtaDPhiMix[ic][iptt][ipta]  = (TH2D*) htmp[1][ic][fVertexSkip][iptt][ipta]->Clone(Form("hDEtaDPhiMix_%s",cta.Data()));
+						hDEtaDPhiReal[ic][iptt][ipta] = (TH2D*) htmp[0][ic][fVertexSkip][iptt][ipta]->Clone(Form("hDEtaDPhiReal_%s",cta.Data()));
+						hDEtaDPhiRaw[ic][iptt][ipta]->Reset();
+						hDEtaDPhiMix[ic][iptt][ipta]->Reset();
+						hDEtaDPhiReal[ic][iptt][ipta]->Reset();
+                    }
+                }
+            }
+            //for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
+
+
+            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
+            {
+                for(int ipta=0; ipta<fNumPta; ipta++)
+                {
+                    if(fPTt->At(iptt) < fPTa->At(ipta))
+                        continue; // PTa upper border should be smaller than PTt lower
+
+                    for(int ic=0; ic<fNumCent; ic++)
+                    {
                         for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
                         {
                             // Add raw correlation
                             hDEtaDPhiRaw[ic][iptt][ipta]->Add( htmp[0][ic][iv][iptt][ipta] );
+                            hDEtaDPhiMix[ic][iptt][ipta]->Add( htmp[1][ic][iv][iptt][ipta] ); // this should be deleted once add large pt combination is enabled
 
                             // Add mixed (combine large pT bin)
-                            if(fPTa->At(ipta)+0.1 < fsumAssocBinsForMixAbove || fPTt->At(iptt) + 0.1 < fsumTriggBinsForMixAbove )
+
+							if(fPTa->At(ipta)+0.1 < fsumAssocBinsForMixAbove && fPTt->At(iptt) + 0.1 < fsumTriggBinsForMixAbove )
                             {
-                                htmp_mix = (TH2D*) htmp[1][ic][iv][iptt][ipta]->Clone(Form("%s_tmp",htmp[1][ic][iv][iptt][ipta]->GetName()));
+								htmp_mix[ic][iv][iptt][ipta] = (TH2D*) htmp[1][ic][iv][iptt][ipta]->Clone(Form("%s_tmp",htmp[1][ic][iv][iptt][ipta]->GetName()));
                                 hDEtaDPhiMix[ic][iptt][ipta]->Add(htmp[1][ic][iv][iptt][ipta]);
                             } else {
-                                htmp_mix = (TH2D*) htmp[1][ic][iv][iptt][ipta]->Clone(Form("%s_tmp",htmp[1][ic][iv][iptt][ipta]->GetName()));
-                                htmp_mix->Reset();
+								htmp_mix[ic][iv][iptt][ipta] = (TH2D*) htmp[1][ic][iv][iptt][ipta]->Clone(Form("%s_tmp",htmp[1][ic][iv][iptt][ipta]->GetName()));
+								htmp_mix[ic][iv][iptt][ipta]->Reset();
                                 for(int it=fMinPTtBin; it<fNumPtt; it++ ) {
                                     for(int ia=0; ia<fNumPta; ia++)
                                     {
                                         if(fPTt->At(it) < fPTa->At(ia)) continue;
                                         if(fPTa->At(ia)+0.1 < fsumAssocBinsForMixAbove || fPTt->At(it) + 0.1 < fsumTriggBinsForMixAbove ) continue;
-                                        htmp_mix->Add( htmp[1][ic][iv][it][ia] );
+										htmp_mix[ic][iv][iptt][ipta]->Add( htmp[1][ic][iv][it][ia] );
                                         hDEtaDPhiMix[ic][iptt][ipta]->Add( htmp[1][ic][iv][it][ia] );
                                     }
                                 }
@@ -798,22 +938,25 @@ class MCorr
                         {
                             for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
                             {
-                                htmp_raw = (TH2D*) htmp[0][ic][iv][iptt][ipta]->Clone(Form("%s_tmp",htmp[0][ic][iv][iptt][ipta]->GetName()));
-                                htmp_mix->Scale( 1./mt->GetMixedNorm2D(htmp_mix) );
-                                htmp_raw->Divide(htmp_mix);
+                                htmp_raw = (TH2D*) htmp[0][ic][iv][iptt][ipta]->Clone(Form("%s_T%d_tmp",htmp[0][ic][iv][iptt][ipta]->GetName(),fType));
+                                //htmp_mix[ic][iv][iptt][ipta]->Scale( 1./mt->GetMixedNorm2D(htmp_mix[ic][iv][iptt][ipta]) );
+                                //htmp_raw->Divide(htmp_mix[ic][iv][iptt][ipta]);
+                                scaleMix = 1./mt->GetMixedNorm2D(htmp[1][ic][iv][iptt][ipta], deta);
+                                htmp[1][ic][iv][iptt][ipta]->Scale(scaleMix);
+                                htmp_raw->Divide(htmp[1][ic][iv][iptt][ipta]);
+                                htmp[1][ic][iv][iptt][ipta]->Scale(1./scaleMix);
                                 hDEtaDPhiReal[ic][iptt][ipta]->Add( htmp_raw );
                             }
                         }
-                        if(!fVertexCorr)
+                        else
                         {
                             hDEtaDPhiReal[ic][iptt][ipta]->Add( hDEtaDPhiRaw[ic][iptt][ipta] );
-                            scaleMix = 1./( mt->GetMixedNorm2D(hDEtaDPhiMix[ic][iptt][ipta]) );
+                            scaleMix = 1./( mt->GetMixedNorm2D(hDEtaDPhiMix[ic][iptt][ipta], deta) );
                             hDEtaDPhiMix[ic][iptt][ipta]->Scale(scaleMix);
                             hDEtaDPhiReal[ic][iptt][ipta]->Divide( hDEtaDPhiMix[ic][iptt][ipta] );
+                            hDEtaDPhiMix[ic][iptt][ipta]->Scale(1./scaleMix);
                         }
-                        hDEtaDPhiReal[ic][iptt][ipta]->Scale( 1./fNTrigg[ic][iptt] );
-
-
+                        hDEtaDPhiReal[ic][iptt][ipta]->Scale( 1./fNTrigg[ic][iptt], "width" );
                     }
                 }
             }
@@ -821,118 +964,84 @@ class MCorr
         }
 
 
-        void ProjectDEtaDPhi(Double_t Rcut)
+		void ProjectDEtaDPhi()
         {
             std::cout << "MCorr::ProjectDEtaDPhi()...\n";
-            TString cta;
-            Int_t phi_firstbin, phi_lastbin;
-            Int_t phi_firstbin_far, phi_lastbin_far;
+			TString cta = "";
+            Int_t phi_firstbin = -1;
+            Int_t phi_lastbin = -1;
+            Int_t phi_firstmixedbin = -1;
+            Int_t phi_lastmixedbin = -1;
+            Double_t firstmixed = 0.6*TMath::Pi()+0.001;
+            Double_t lastmixed  = 1.4*TMath::Pi()-0.001;
+            Int_t phi_firstbin_far = -1;
+            Int_t phi_lastbin_far = -1;
+            double deta = fEta->At(fNumEta);
 
-            Int_t eta_firstbin, eta_midbin, eta_lastbin;
-            //const double dEta = fEta->At(fNumEta) - fEta->At(0);
-
-            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
-                for(int ipta=0; ipta<fNumPta; ipta++){
+            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++) {
+                for(int ipta=0; ipta<fNumPta; ipta++) {
                     if(fPTt->At(iptt) < fPTa->At(ipta))
                         continue; // PTa upper border should be smaller than PTt lower
-                    for(int ic=0; ic<fNumCent; ic++)
-                    {
+                    for(int ic=0; ic<fNumCent; ic++) {
                         cta = GetCTA(ic,iptt,ipta);
 
-                        phi_firstbin = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->FindBin(-fPhiCut );
-                        phi_lastbin  = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->FindBin(fPhiCut );
-                        eta_firstbin = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetXaxis()->FindBin(-fEtaCut );
-                        eta_midbin   = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetXaxis()->FindBin(fEtaCut );
-                        eta_lastbin  = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetXaxis()->FindBin(fEta->At(fNumEta));
+						phi_firstbin = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->FindBin(-fPhiCut+0.001);
+						phi_lastbin  = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->FindBin(fPhiCut-0.001);
+                        phi_firstmixedbin = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->FindBin(firstmixed);
+                        phi_lastmixedbin  = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->FindBin(lastmixed);
 
-                        //std::cout << ic << "\t" << iptt << "\t" << ipta << std::endl;
-                        //std::cout << "\t" << fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->GetNbins() << "\t" << fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->GetBinWidth(2) << std::endl;
-                        //std::cout << "\t" << fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->GetBinLowEdge(phi_firstbin-1) << " - " << fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->GetBinUpEdge(phi_lastbin) << "\t" << fPhiCut << std::endl;
-                        //std::cout << "\t" << phi_firstbin-1 << " - " << phi_lastbin << std::endl;
+						// ------ 2D correlation
 
-                        hDEtaRaw2D[ic][iptt][ipta]  = (TH1D*) hDEtaDPhiRaw[ic][iptt][ipta]->ProjectionX( Form("hDEtaRaw2D_%s",cta.Data()), phi_firstbin, phi_lastbin,"e" );
-                        hDEtaMix2D[ic][iptt][ipta]  = (TH1D*) hDEtaDPhiMix[ic][iptt][ipta]->ProjectionX( Form("hDEtaMix2D_%s",cta.Data()), phi_firstbin, phi_lastbin,"e" );
+						hDEtaRaw2D[ic][iptt][ipta]  = (TH1D*) hDEtaDPhiRaw[ic][iptt][ipta]->ProjectionX( Form("hDEtaRaw2D_%s",cta.Data()), phi_firstbin, phi_lastbin,"e" );
+                        hDEtaRaw2D[ic][iptt][ipta]->Scale(1./double(phi_lastbin-phi_firstbin+1));
+
+                        // preserve correct 2D normalisation
+                        Double_t scaleMix = 1./mt->GetMixedNorm2D(hDEtaDPhiMix[ic][iptt][ipta], deta);
+                        hDEtaDPhiMix[ic][iptt][ipta]->Scale(scaleMix);
+
+                        hDEtaMix2D[ic][iptt][ipta]  = (TH1D*) hDEtaDPhiMix[ic][iptt][ipta]->ProjectionX( Form("hDEtaMix2D_%s",cta.Data()), phi_firstmixedbin, phi_lastmixedbin,"e" );
+                        hDEtaMix2D[ic][iptt][ipta]->Scale(1./double(phi_lastmixedbin-phi_firstmixedbin+1));
+                        hDEtaDPhiMix[ic][iptt][ipta]->Scale(1./scaleMix); // restore original
+
                         hDEtaReal2D[ic][iptt][ipta] = (TH1D*) hDEtaDPhiReal[ic][iptt][ipta]->ProjectionX( Form("hDEtaReal2D_%s",cta.Data()), phi_firstbin, phi_lastbin,"e" );
-                        //hDEtaReal2D[ic][iptt][ipta]->Scale(1./double(phi_lastbin-phi_firstbin));
-                        //hDEtaReal2D[ic][iptt][ipta]->Scale(2.*fPhiCut);
-                        hDEtaReal2D[ic][iptt][ipta]->RebinX(2);
-                        hDEtaReal2D[ic][iptt][ipta]->Scale(1., "width");
-                        hDEtaReal2DFlip[ic][iptt][ipta] = (TH1D*)mt->Flip( hDEtaReal2D[ic][iptt][ipta] );
+                        hDEtaReal2D[ic][iptt][ipta]->Scale(1./2./TMath::Pi());
+                        //hDEtaReal2D[ic][iptt][ipta]->Scale(1./2.);
 
+                        // ------ prepare wing correction
+						phi_firstbin_far = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->FindBin( (1.-0.4)*TMath::Pi() );
+                        phi_lastbin_far  = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->FindBin( (1.+0.4)*TMath::Pi() );
 
-
-                        //hDEtaRaw2D[ic][iptt][ipta]->Print();
-                        //std::cout << hDEtaRaw2D[ic][iptt][ipta] << std::endl;
-                        //std::cout << hDEtaRaw2D[ic][iptt][ipta]->GetEntries() << std::endl;
-
-
-                        //hDEtaRaw2DRcut[ic][iptt][ipta]  = (TH1D*) mt->DoProjectionCircle(hDEtaDPhiRaw[ic][iptt][ipta], true, Form("hDEtaRaw2DCirc_%s",cta.Data()), phi_firstbin, phi_lastbin, Rcut, "e" );
-                        //hDEtaMix2DRcut[ic][iptt][ipta]  = (TH1D*) mt->DoProjectionCircle(hDEtaDPhiMix[ic][iptt][ipta], true, Form("hDEtaMix2DCirc_%s",cta.Data()), phi_firstbin, phi_lastbin, Rcut, "e" );
-                        //hDEtaReal2DRcut[ic][iptt][ipta] = (TH1D*) mt->DoProjectionCircle(hDEtaDPhiReal[ic][iptt][ipta], true, Form("hDEtaReal2DCirc_%s",cta.Data()), phi_firstbin, phi_lastbin, Rcut, "e" );
-                        //hDEtaReal2DRcut[ic][iptt][ipta]->Scale(1./double(phi_lastbin-phi_firstbin));
-                        //hDEtaReal2DRcut[ic][iptt][ipta]->Scale(2.*fPhiCut);
-
-
-                        phi_firstbin_far = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->FindBin( 1.-fPhiCut );
-                        phi_lastbin_far  = fhDphiDetaPta[0][ic][0][iptt][ipta]->GetYaxis()->FindBin( 1.+fPhiCut );
-                        //hDEtaRaw2DFar[ic][iptt][ipta]  = (TH1D*) hDEtaDPhiRaw[ic][iptt][ipta]->ProjectionX( Form("hDEtaRaw2DFar_%s",cta.Data()), phi_firstbin_far, phi_lastbin_far,"e" );
-                        //hDEtaMix2DFar[ic][iptt][ipta]  = (TH1D*) hDEtaDPhiMix[ic][iptt][ipta]->ProjectionX( Form("hDEtaMix2DFar_%s",cta.Data()), phi_firstbin_far, phi_lastbin_far,"e" );
                         hDEtaReal2DFar[ic][iptt][ipta] = (TH1D*) hDEtaDPhiReal[ic][iptt][ipta]->ProjectionX( Form("hDEtaReal2DFar_%s",cta.Data()), phi_firstbin_far, phi_lastbin_far,"e" );
-                        //hDEtaMix2DFar[ic][iptt][ipta]->Scale(1./mt->GetMixedNorm1D( hDEtaMix2DFar[ic][iptt][ipta]));
-                        //hDEtaReal2DFar[ic][iptt][ipta]->Divide( hDEtaMix2DFar[ic][iptt][ipta] );
-                        //hDEtaReal2DFar[ic][iptt][ipta]->RebinX(2);
-                        hDEtaReal2DFar[ic][iptt][ipta]->Scale(1./mt->GetMixedNorm1D( hDEtaReal2DFar[ic][iptt][ipta] ));
+                        hDEtaReal2DFar[ic][iptt][ipta]->Scale(1./mt->GetMixedNorm1D(hDEtaReal2DFar[ic][iptt][ipta], 8));
+
                         // set error manually to zero so wing correction doesn't introduce error
                         for(int ib=1; ib<=hDEtaReal2DFar[ic][iptt][ipta]->GetNbinsX(); ib++)
                             hDEtaReal2DFar[ic][iptt][ipta]->SetBinError(ib,0);
 
-/*
+                        // wing correction only for the 2D mixed event correction method
+                        if(fWingCorr) {
+                            hDEtaReal2D[ic][iptt][ipta]->Divide( hDEtaReal2DFar[ic][iptt][ipta] );
+                        }
+                        hDEtaRealFlip2D[ic][iptt][ipta] = (TH1D*)mt->Flip( hDEtaReal2D[ic][iptt][ipta] );
 
-                        hDEtaReal2Dmixed1D[ic][iptt][ipta] = (TH1D*) hDEtaRaw2D[ic][iptt][ipta]->Clone();
-                        hDEtaReal2Dmixed1D[ic][iptt][ipta]->Divide(hDEtaMix2D[ic][iptt][ipta]);
-                        hDEtaReal2Dmixed1D[ic][iptt][ipta]->Scale(1./fNTrigg[ic][iptt]);
-                        hDEtaReal2Dmixed1D[ic][iptt][ipta]->Scale(2.*fPhiCut);
+						// ------ 1D correlation
 
+						hDEtaReal[ic][iptt][ipta] = (TH1D*) hDEtaRaw2D[ic][iptt][ipta]->Clone(Form("hDEtaReal2Dmixed1D_%s",cta.Data()));
+						hDEtaReal[ic][iptt][ipta]->Divide(hDEtaMix2D[ic][iptt][ipta]);
 
-                        hDPhiRaw2D[0][ic][iptt][ipta]  = (TH1D*) hDEtaDPhiRaw[ic][iptt][ipta]->ProjectionY( Form("hDPhiRaw2D_E00%s",cta.Data()), eta_firstbin, eta_midbin,"e" );
-                        hDPhiMix2D[0][ic][iptt][ipta]  = (TH1D*) hDEtaDPhiMix[ic][iptt][ipta]->ProjectionY( Form("hDPhiMix2D_E00%s",cta.Data()), eta_firstbin, eta_midbin,"e" );
-                        hDPhiReal2D[0][ic][iptt][ipta] = (TH1D*) hDEtaDPhiReal[ic][iptt][ipta]->ProjectionY( Form("hDPhiReal2D_E00%s",cta.Data()), eta_firstbin, eta_midbin,"e" );
-                        hDPhiReal2D[0][ic][iptt][ipta]->Scale(1./double(eta_midbin-eta_firstbin));
-                        hDPhiReal2D[0][ic][iptt][ipta]->Scale(2.*fEtaCut);
-
-                        hDPhiRaw2D[1][ic][iptt][ipta]  = (TH1D*) hDEtaDPhiRaw[ic][iptt][ipta]->ProjectionY( Form("hDPhiRaw2D_E01%s",cta.Data()), eta_midbin, eta_lastbin,"e" );
-                        hDPhiMix2D[1][ic][iptt][ipta]  = (TH1D*) hDEtaDPhiMix[ic][iptt][ipta]->ProjectionY( Form("hDPhiMix2D_E01%s",cta.Data()), eta_midbin, eta_lastbin,"e" );
-                        hDPhiReal2D[1][ic][iptt][ipta] = (TH1D*) hDEtaDPhiReal[ic][iptt][ipta]->ProjectionY( Form("hDPhiReal2D_E01%s",cta.Data()), eta_midbin, eta_lastbin,"e" );
-                        hDPhiReal2D[1][ic][iptt][ipta]->Scale(1./double(eta_lastbin-eta_midbin));
-                        hDPhiReal2D[1][ic][iptt][ipta]->Scale(2.*fEtaCut);
-
-                        hDPhiReal2D[2][ic][iptt][ipta] = (TH1D*)hDPhiReal2D[0][ic][iptt][ipta]->Clone(Form("hDPhiReal2D_E02%s", cta.Data()));
-                        hDPhiReal2D[2][ic][iptt][ipta]->Add(hDPhiReal2D[1][ic][iptt][ipta], -1.);
-
-                        hDPhiRaw2DRcut[0][ic][iptt][ipta]  = (TH1D*) mt->DoProjectionCircle(hDEtaDPhiRaw[ic][iptt][ipta], false, Form("hDPhiRaw2DCirc_%s",cta.Data()), eta_firstbin, eta_midbin, Rcut, "e" );
-                        hDPhiMix2DRcut[0][ic][iptt][ipta]  = (TH1D*) mt->DoProjectionCircle(hDEtaDPhiMix[ic][iptt][ipta], false, Form("hDPhiMix2DCirc_%s",cta.Data()), eta_firstbin, eta_midbin, Rcut, "e" );
-                        hDPhiReal2DRcut[0][ic][iptt][ipta] = (TH1D*) mt->DoProjectionCircle(hDEtaDPhiReal[ic][iptt][ipta], false, Form("hDPhiReal2DCirc_%s",cta.Data()), eta_firstbin, eta_midbin, Rcut, "e" );
-                        hDPhiReal2DRcut[0][ic][iptt][ipta]->Scale(1./double(eta_midbin-eta_firstbin));
-                        hDPhiReal2DRcut[0][ic][iptt][ipta]->Scale(2.*fEtaCut);
-
-                        hDPhiRaw2DRcut[1][ic][iptt][ipta]  = (TH1D*) mt->DoProjectionCircle(hDEtaDPhiRaw[ic][iptt][ipta], false, Form("hDPhiRaw2DCirc_%s",cta.Data()), eta_midbin, eta_lastbin, Rcut, "e" );
-                        hDPhiMix2DRcut[1][ic][iptt][ipta]  = (TH1D*) mt->DoProjectionCircle(hDEtaDPhiMix[ic][iptt][ipta], false, Form("hDPhiMix2DCirc_%s",cta.Data()), eta_midbin, eta_lastbin, Rcut, "e" );
-                        hDPhiReal2DRcut[1][ic][iptt][ipta] = (TH1D*) mt->DoProjectionCircle(hDEtaDPhiReal[ic][iptt][ipta], false, Form("hDPhiReal2DCirc_%s",cta.Data()), eta_midbin, eta_lastbin, Rcut, "e" );
-                        hDPhiReal2DRcut[1][ic][iptt][ipta]->Scale(1./double(eta_lastbin-eta_midbin));
-                        hDPhiReal2DRcut[1][ic][iptt][ipta]->Scale(2.*fEtaCut);
-
-                        hDPhiReal2Dmixed1D[0][ic][iptt][ipta] = (TH1D*)hDPhiRaw2D[0][ic][iptt][ipta]->Clone();
-                        hDPhiReal2Dmixed1D[0][ic][iptt][ipta]->Divide(hDPhiMix2D[0][ic][iptt][ipta] );
-                        */
-
+                        hDEtaReal[ic][iptt][ipta]->Scale(1./fNTrigg[ic][iptt], "width");
+                        hDEtaReal[ic][iptt][ipta]->Scale(1., "width");
+                        //if(fType==0) hDEtaReal[ic][iptt][ipta]->Scale(4.0);
+                        hDEtaRealFlip[ic][iptt][ipta] = (TH1D*) mt->Flip(hDEtaReal[ic][iptt][ipta]);
                     }
                 }
             }
             fProjectedDEtaDPhi = true;
         }
+
         void DrawWingCorr()
         {
-            if(!fProjectedDEtaDPhi) std::cerr << "MCORR::DrawWingCorrWing() error: load and project 2D histos first\n";
+            if(!fProjectedDEtaDPhi) return;
 
             TString fname;
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
@@ -942,7 +1051,7 @@ class MCorr
                             continue; // PTa upper border should be smaller than PTt lower
 
                         MPlot * mwcorr = new MPlot(iplot++, "#Delta#eta", "wing correction", false);
-                        //hDEtaReal2DFar[ic][iptt][ipta]->Rebin(2); hDEtaReal2DFar[ic][iptt][ipta]->Scale(1./2.);
+						hDEtaReal2DFar[ic][iptt][ipta]->Rebin(2); hDEtaReal2DFar[ic][iptt][ipta]->Scale(1./2.);
                         hList = { hDEtaReal2DFar[ic][iptt][ipta] };
                         legList={""};
                         mwcorr->addHList(hList, legList, "pe");
@@ -952,13 +1061,61 @@ class MCorr
                         if(fType != kPP) mwcorr->AddInfo( BuildCentTitle(ic) );
                         mwcorr->AddInfo( BuildPTtTitle(iptt) );
                         mwcorr->AddInfo( BuildPTaTitle(ipta) );
-                        mwcorr->SetLimitsX(-1.3,1.3);
+						mwcorr->SetLimitsX(-1.6,1.6);
                         mwcorr->Draw();
                         fname = Form("../figs/Corr/wingcorr_%s_%s", fTypeName.Data(), GetCTA(ic,iptt,ipta).Data());
                         mwcorr->Save( fname );
                     }
                 }
             }
+        }
+
+        void DrawDEtaWingAll()
+        {
+            if(!fProjectedDEtaDPhi)
+                return;
+
+            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
+                for(int ic=0; ic<fNumCent; ic++){
+                    for(int ipta=0; ipta<fNumPta; ipta++){
+                        if(fPTt->At(iptt) < fPTa->At(ipta))
+                            continue; // PTa upper border should be smaller than PTt lower
+                        DrawDEtaWing(ic,iptt,ipta);
+                    }
+                }
+            }
+        }
+
+        void DrawDEtaWing(int ic, int iptt, int ipta)
+        {
+            // needs wing correction to be turned off, otherwise it corrects twice
+            if(fWingCorr) {
+                std::cerr << "Turn off wing correction to use DrawDEtaWing()\n";
+                return;
+            }
+            TH1D * htmp_on = (TH1D*)hDEtaReal2D[ic][iptt][ipta]->Clone(Form("hwing_on_%s",hDEtaReal2D[ic][iptt][ipta]->GetName()));
+            TH1D * htmp_off = (TH1D*)hDEtaReal2D[ic][iptt][ipta]->Clone(Form("hwing_off_%s",hDEtaReal2D[ic][iptt][ipta]->GetName()));
+            htmp_on->Divide(hDEtaReal2DFar[ic][iptt][ipta]);
+
+            htmp_on->Rebin(2); htmp_on->Scale(1./2.);
+            htmp_off->Rebin(2); htmp_off->Scale(1./2.);
+
+            hList   = { htmp_on, htmp_off };
+
+            legList = {  "wing on", "wing off" };
+            MPlot * mw = new MPlot(iplot++, "#Delta#eta", "1/N_{trigg.}dN/d#Delta#eta", true);
+
+            mw->addHList(hList, legList, "ple");
+            mw->SetLimitsX(-1.6, 1.6);
+
+            mw->AddInfo( BuildInfo() );
+            if(fType != kPP) mw->AddInfo( BuildCentTitle(ic) );
+            mw->AddInfo( BuildPTtTitle(iptt) );
+            mw->AddInfo( BuildPTaTitle(ipta) );
+            mw->Draw();
+
+            mw->Save( Form("../figs/Corr/wingcorr_corr_%s_%s", fTypeName.Data(), GetCTA(ic,iptt,ipta).Data()) );
+
         }
 
         // -------------------------------------
@@ -978,9 +1135,10 @@ class MCorr
                         c[iplot2d] = new TCanvas(Form("canvasfor2dnear%d",iplot2d),"c",800,700);
                         c[iplot2d]->SetTheta(23);
                         c[iplot2d]->SetPhi(-60);
-                        hDEtaDPhiReal[ic][iptt][ipta]->SetAxisRange(-1.5, 1.5,"x");
-                        hDEtaDPhiReal[ic][iptt][ipta]->SetAxisRange(-0.45, 1.45,"y");
-                        hDEtaDPhiReal[ic][iptt][ipta]->Draw("surf2");
+                        hDEtaDPhiMix[ic][iptt][ipta]->SetAxisRange(-1.5, 1.5,"x");
+                        hDEtaDPhiMix[ic][iptt][ipta]->SetAxisRange(-0.45, 1.45,"y");
+                        //hDEtaDPhiReal[ic][iptt][ipta]->Draw("surf2");
+                        hDEtaDPhiMix[ic][iptt][ipta]->Draw("colz");
 
                         c[iplot2d]->SaveAs(Form("../figs/Corr/2D_Near_%s_C%dT%dA%d.pdf",fTypeName.Data(),ic,iptt,ipta));
                         ++iplot2d;
@@ -997,7 +1155,7 @@ class MCorr
         }
         void DrawRawMixed()
         {
-            if(!fLoadedDEta)
+			if(!fProjectedDEtaDPhi)
                 return;
 
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
@@ -1006,18 +1164,24 @@ class MCorr
                         if(fPTt->At(iptt) < fPTa->At(ipta))
                             continue; // PTa upper border should be smaller than PTt lower
 
-                        TH1D * htemp = (TH1D*) hDEtaMix[ic][iptt][ipta];
-                        mt->scaleToThisTail(htemp, hDEtaRaw[ic][iptt][ipta], 1.,1.6);
+                        TH1D * htemp = (TH1D*) hDEtaMix2D[ic][iptt][ipta]->Clone(Form("hmixtemp_%s",hDEtaMix2D[ic][iptt][ipta]->GetName()));
+                        //mt->scaleToThisTail(htemp, hDEtaRaw2D[ic][iptt][ipta], 1.,1.6);
+                        //hList = {  hDEtaRaw2D[ic][iptt][ipta], htemp };
+                        //legList = {"raw", "mixed"};
 
-                        hList = {  htemp, hDEtaRaw[ic][iptt][ipta] };
-                        legList = {"mixed", "raw"};
+                        hList = { htemp };
+                        legList = {"mixed"};
 
-                        MPlot * mrawm = new MPlot(iplot++, "#Delta#eta", "counts", true);
+                        MPlot * mrawm = new MPlot(iplot++, "#Delta#eta", "counts", false);
                         mrawm->addHList(hList, legList, "pe");
                         mrawm->AddInfo( BuildInfo() );
+
                         if(fType != kPP) mrawm->AddInfo( BuildCentTitle(ic) );
                         mrawm->AddInfo( BuildPTtTitle(iptt) );
                         mrawm->AddInfo( BuildPTaTitle(ipta) );
+                        double y1 = hDEtaMix2D[ic][iptt][ipta]->GetBinContent(hDEtaMix2D[ic][iptt][ipta]->FindBin(-0.001));
+                        double y2 = hDEtaMix2D[ic][iptt][ipta]->GetBinContent(hDEtaMix2D[ic][iptt][ipta]->FindBin(0.001));
+                        mrawm->AddInfo( Form("Mixed at 0 = %.1f, %.1f", y1, y2) );
                         mrawm->Draw();
                         TString fname = Form("../figs/Corr/eta_rawmix_%s_%s", fTypeName.Data(), GetCTA(ic,iptt,ipta).Data());
                         mrawm->Save( fname );
@@ -1025,9 +1189,147 @@ class MCorr
                 }
             }
         }
-        void DrawDEta()
+
+        // check mixed event symmetry for opposite-side vertex bins
+        void DrawMixedVtx()
         {
-            if(!fLoadedDEta)
+            TH1D * htmp, * h1, * h2;
+            for(int ic=0; ic<fNumCent; ic++){
+                for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
+                    for(int ipta=0; ipta<fNumPta; ipta++){
+                        if(fPTt->At(iptt) < fPTa->At(ipta))
+                            continue; // PTa upper border should be smaller than PTt lower
+
+                        for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip)/2; iv++) {
+                            h1 = (TH1D*) fhDphiDetaPta[1][ic][iv][iptt][ipta]->ProjectionX(Form("hmvert_%s",GetCVTA(ic,iv,iptt,ipta).Data()));
+                            h2 = (TH1D*) fhDphiDetaPta[1][ic][fNumVtx-iv-1][iptt][ipta]->ProjectionX(Form("hmvert_%s",GetCVTA(ic,fNumVtx-iv-1,iptt,ipta).Data()));
+                            htmp = (TH1D*)h1->Clone(Form("hallmixedvert%s",GetCVTA(ic,fNumVtx-iv-1,iptt,ipta).Data()));
+                            htmp->Add(h2);
+                            htmp->Scale(1./2.);
+
+                            hList = {  h1, h2 };
+                            legList = {  fVtx->BuildTitle(iv), fVtx->BuildTitle(fNumVtx-iv-1) };
+
+                            MPlot * meta = new MPlot(iplot++, "#Delta#eta", "mixed event", true);
+
+                            meta->addHList(hList, legList, "pe");
+                            meta->SetLimitsX(-1.6, 1.6);
+
+                            meta->AddInfo( BuildInfo() );
+                            if(fType != kPP) meta->AddInfo( BuildCentTitle(ic) );
+                            meta->AddInfo( BuildPTtTitle(iptt) );
+                            meta->AddInfo( BuildPTaTitle(ipta) );
+                            meta->Draw();
+
+                            meta->Save( Form("../figs/Test/mixed_vert/mix_%s", GetCVTA(ic,iv,iptt,ipta).Data()) );
+                        }
+                    }
+                }
+            }
+        }
+
+
+
+
+        // check mixed event's ptt and pta dependence:
+        // conclusion: matter is Pb-Pb, can be merged in pp
+        void DrawMixed()
+        {
+            if(!fProjectedDEtaDPhi)
+                return;
+
+            //new TCanvas(); hDEtaDPhiMix[0][2][2]->Draw("surf5");
+
+            TH1D * hall[5][10];
+            TH1D * hmix[5][10][10];
+
+            int minpttbin=fPTt->GetBin(6.);
+            int minptabin=fPTa->GetBin(4.);
+            for(int ic=0; ic<fNumCent; ic++){
+                for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
+
+                    hall[ic][iptt] = (TH1D*)hDEtaMix2D[ic][iptt][0]->Clone(Form("hallC%dT%d",ic,iptt));
+                    hall[ic][iptt]->Reset();
+
+                    for(int ipta=0; ipta<fNumPta; ipta++){
+                        if(fPTt->At(iptt) < fPTa->At(ipta))
+                            continue; // PTa upper border should be smaller than PTt lower
+                        hmix[ic][iptt][ipta] = (TH1D*)hDEtaMix2D[ic][iptt][ipta]->Clone(Form("%s_tmp",hDEtaMix2D[ic][iptt][ipta]->GetName()));
+                        hall[ic][iptt]->Add((TH1D*)hDEtaMix2D[ic][iptt][ipta]);
+                        hmix[ic][iptt][ipta]->Scale(1./mt->GetMixedNorm1D(hmix[ic][iptt][ipta]));
+
+                    }
+                    hall[ic][iptt]->Scale(1./mt->GetMixedNorm1D(hall[ic][iptt]));
+
+                    hList   = { hall[ic][iptt] };
+                    legList = { "all" };
+
+                    for(int ipta=0; ipta<fNumPta; ipta++){
+                        if(fPTt->At(iptt) < fPTa->At(ipta))
+                            continue; // PTa upper border should be smaller than PTt lower
+                        hList.push_back(hmix[ic][iptt][ipta]);
+                        legList.push_back(fPTa->BuildTitle(ipta));
+                    }
+
+
+                    MPlot * meta = new MPlot(iplot++, "#Delta#eta", "mixed event", true);
+
+                    meta->addHList(hList, legList, "pe");
+                    meta->SetLimitsX(-1.6, 1.6);
+
+                    meta->AddInfo( BuildInfo() );
+                    if(fType != kPP) meta->AddInfo( BuildCentTitle(ic) );
+                    meta->AddInfo( BuildPTtTitle(iptt) );
+                    meta->Draw();
+
+                    meta->Save( Form("../figs/Test/mixed_merge/mix_%s", GetCT(ic,iptt).Data()) );
+                }
+
+
+                for(int ipta=0; ipta<fNumPta; ipta++){
+                    hall[ic][ipta] = (TH1D*)hDEtaMix2D[ic][0][0]->Clone(Form("hallC%dA%d",ic,ipta));
+                    hall[ic][ipta]->Reset();
+                    for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
+                        if(fPTt->At(iptt) < fPTa->At(ipta))
+                            continue; // PTa upper border should be smaller than PTt lower
+                        hmix[ic][iptt][ipta] = (TH1D*)hDEtaMix2D[ic][iptt][ipta]->Clone(Form("%s_tmp",hDEtaMix2D[ic][iptt][ipta]->GetName()));
+                        hall[ic][ipta]->Add((TH1D*)hDEtaMix2D[ic][iptt][ipta]);
+                        hmix[ic][iptt][ipta]->Scale(1./mt->GetMixedNorm1D(hmix[ic][iptt][ipta]));
+
+                    }
+                    hall[ic][ipta]->Scale(1./mt->GetMixedNorm1D(hall[ic][ipta]));
+
+                    hList   = { hall[ic][ipta] };
+                    legList = { "all" };
+
+                    for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
+                        if(fPTt->At(iptt) < fPTa->At(ipta))
+                            continue; // PTa upper border should be smaller than PTt lower
+                        hList.push_back(hmix[ic][iptt][ipta]);
+                        legList.push_back(fPTt->BuildTitle(iptt));
+                    }
+
+
+                    MPlot * meta2 = new MPlot(iplot++, "#Delta#eta", "mixed event", true);
+
+                    meta2->addHList(hList, legList, "pe");
+                    meta2->SetLimitsX(-1.6, 1.6);
+
+                    meta2->AddInfo( BuildInfo() );
+                    if(fType != kPP) meta2->AddInfo( BuildCentTitle(ic) );
+                    meta2->AddInfo( BuildPTaTitle(ipta) );
+                    meta2->Draw();
+
+                    meta2->Save( Form("../figs/Test/mixed_merge/mix_%s", GetCA(ic,ipta).Data()) );
+
+                }
+            }
+        }
+
+
+        void DrawDEtaFlip()
+        {
+			if(!fProjectedDEtaDPhi)
                 return;
 
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
@@ -1057,7 +1359,7 @@ class MCorr
 
         void DrawCorr2D1D(bool save, int which)
         {
-            if(!fLoadedDEta && !fLoadedDPhi)
+			if(!fProjectedDEtaDPhi)
                 return;
 
             TString xtit, ytit, fname;
@@ -1076,7 +1378,7 @@ class MCorr
                                 xtit =  "#Delta#eta"; ytit = "1/N_{trigg.}dN/d#Delta#eta";
                                 fname = Form("../figs/Corr/eta_2D1D_%s_%s", fTypeName.Data(), GetCTA(ic,iptt,ipta).Data());
 
-                                hList   = {  hDEtaSig[0][ic][iptt][ipta], hDEtaSig2D[0][ic][iptt][ipta] };
+								hList   = {  hDEtaSig1D[0][ic][iptt][ipta], hDEtaSig2D[0][ic][iptt][ipta] };
                                 legList = {  "1D", "2D" };
                                 xlimit = 1.4;
                                 break;
@@ -1117,223 +1419,29 @@ class MCorr
             }
         }
 
-        void LoadDEtaHistos() {
-            std::cout << "MCorr::LoadDEtaHistos()...\n";
-            if(!fLoadedDEtaDPhi) std::cerr<<"Please load 2D histos first!\n";
 
-            const int iptt_mixed = fPTt->GetBin( fsumTriggBinsForMixAbove );
-            const int ipta_mixed = fPTa->GetBin( fsumAssocBinsForMixAbove );
-
-            const double dEta = fEta->At(fNumEta);
-            const int PhiSkipPi = fPhi->GetBin(fPhiCut * TMath::Pi() );
-            double scaleMix = 1.;
-
-            TString cta, cvta;
-            TH1D * htmp = nullptr;
-            TH1D * htmp_mixed[20];
-
-            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
-            {
-                for(int ipta=0; ipta<fNumPta; ipta++)
-                {
-                    if(fPTt->At(iptt) < fPTa->At(ipta))
-                        continue; // PTa upper border should be smaller than PTt lower
-
-                    for(int ic=0; ic<fNumCent; ic++)
-                    {
-                        cta = GetCTA(ic,iptt,ipta);
-                        hDEtaRaw[ic][iptt][ipta] = (TH1D*)fhDEtaNearRaw[ic][0][0][iptt][ipta]->Clone(Form("hDEtaRaw_%s",cta.Data()) );
-                        hDEtaRaw[ic][iptt][ipta]->Reset();
-                        hDEtaRaw[ic][iptt][ipta]->Rebin(2);
-
-                        if( fWhichMixed == 0 ) {
-                            hDEtaMix[ic][iptt][ipta] = (TH1D*)fhDEtaNearMix[ic][0][0][iptt][ipta]->Clone(Form("hDEtaMix_%s",cta.Data()) );
-                        }
-                        if( fWhichMixed == 1 ) {
-                            hDEtaMix[ic][iptt][ipta] = (TH1D*)fhDEtaNearMix[ic][0][iptt][ipta]->Clone(Form("hDEtaMix_%s",cta.Data()) );                            
-                        }
-                        hDEtaMix[ic][iptt][ipta]->Reset();
-                        hDEtaMix[ic][iptt][ipta]->Rebin(2);
-
-                        // loading vertex bins
-                        for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
-                        {
-                            cvta = GetCVTA(ic,iv,iptt,ipta);
-
-                            hDEtaRawVtx[ic][iv][iptt][ipta] = (TH1D*)fhDEtaNearRaw[ic][iv][0][iptt][ipta]->Clone(Form("hDEtaRawVtx_%s",cvta.Data()) );
-                            hDEtaRawVtx[ic][iv][iptt][ipta]->Reset();
-                            hDEtaRawVtx[ic][iv][iptt][ipta]->Rebin(2);
-
-                            hDEtaMixVtx[ic][iv][iptt][ipta] = (TH1D*)hDEtaMix[ic][iptt][ipta]->Clone(Form("hDEtaMixVtx_%s",cvta.Data()) );
-                            hDEtaMixVtx[ic][iv][iptt][ipta]->Reset();
-
-                            hDEtaMixVtxTmp[ic][iv][iptt][ipta] = (TH1D*)hDEtaMix[ic][iptt][ipta]->Clone(Form("hDEtaRawVtx_%s",cvta.Data()) );
-                            hDEtaMixVtxTmp[ic][iv][iptt][ipta]->Reset();
-
-
-                            if( fWhichMixed == 0 ) {
-                                for(int ip=0; ip<PhiSkipPi; ip++) {
-                                    htmp = (TH1D*)fhDEtaNearMix[ic][iv][ip][iptt][ipta]->Clone();
-                                    htmp->Rebin(2);
-                                    hDEtaMixVtx[ic][iv][iptt][ipta]->Add( htmp );
-                                    hDEtaMixVtxTmp[ic][iv][iptt][ipta]->Add( htmp);
-                                }
-                            }
-                            if( fWhichMixed == 1 ) {
-                                htmp = (TH1D*)fhDEtaNearMix[ic][iv][iptt][ipta]->Clone();
-                                htmp->Rebin(2);
-                                hDEtaMixVtx[ic][iv][iptt][ipta]->Add( htmp );
-                                hDEtaMixVtxTmp[ic][iv][iptt][ipta]->Add( htmp );
-                            }
-
-                            // simply adding up PhiGap bins in range
-                            for(int ip=0; ip<PhiSkipPi; ip++)
-                            {
-                                htmp = (TH1D*)fhDEtaNearRaw[ic][iv][ip][iptt][ipta]->Clone();
-                                htmp->Rebin(2);
-                                hDEtaRawVtx[ic][iv][iptt][ipta]->Add( htmp );
-                                hDEtaRaw[ic][iptt][ipta]->Add( htmp );
-                            }
-                            // prepare to correct with mixed event
-                            hDEtaRealVtx[ic][iv][iptt][ipta] = (TH1D*)hDEtaRawVtx[ic][iv][iptt][ipta]->Clone( "hDEtaRealVtx_"+cvta );
-                            hDEtaMix[ic][iptt][ipta]->Add( hDEtaMixVtx[ic][iv][iptt][ipta] );
-                        }
-                    }
-                }
-            }
-
-            // combine ptt and pta bins in mixed event for pp
-            // to achieve a better statistics
-            for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
-            {
-                htmp_mixed[iv] = (TH1D*)hDEtaMixVtx[0][fVertexSkip][fMinPTtBin][0]->Clone("htmp_mixed");
-                htmp_mixed[iv]->Reset();
-                for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
-                {
-                    // finish and restart loop so one can choose higher pta bin for mixed event
-                    for(int ipta=0; ipta<fNumPta; ipta++)
-                    {
-                        if(fPTt->At(iptt) < fPTa->At(ipta))
-                            continue; // PTa upper border should be smaller than PTt lower
-
-                        htmp_mixed[iv]->Add( hDEtaMixVtx[0][iv][iptt][ipta] );
-                    }
-                }
-                htmp_mixed[iv]->Scale(1./mt->GetMixedNorm1D(htmp_mixed[iv]));
-            }
-
-            // Combine larger pT bins
-            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
-            {
-                for(int ipta=0; ipta<fNumPta; ipta++)
-                {
-                    if(fPTt->At(iptt) < fPTa->At(ipta))
-                        continue; // PTa upper border should be smaller than PTt lower
-                    for(int ic=0; ic<fNumCent; ic++)
-                    {
-                        for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
-                        {
-
-                            // Add mixed (combine large pT bin)
-                            if(fPTa->At(ipta)+0.1 < fsumAssocBinsForMixAbove || fPTt->At(iptt) + 0.1 < fsumTriggBinsForMixAbove )
-                            {
-                                // this part is done already
-                            } else {
-                                //hDEtaMixVtx[ic][iv][iptt][ipta]->Reset();
-                                for(int it=fMinPTtBin; it<fNumPtt; it++ ) {
-                                    for(int ia=0; ia<fNumPta; ia++)
-                                    {
-                                        if(fPTt->At(it) < fPTa->At(ia)) continue;
-                                        if(fPTa->At(ia)+0.1 < fsumAssocBinsForMixAbove || fPTt->At(it) + 0.1 < fsumTriggBinsForMixAbove ) continue;
-                                        //cout << fPTt->At(iptt) << "\t" << fPTa->At(ipta) << "\t" << fPTt->At(it) << "\t" << fPTa->At(ia) << endl;
-                                        hDEtaMixVtx[ic][iv][iptt][ipta]->Add( hDEtaMixVtxTmp[ic][iv][it][ia] );
-                                        //if(ic==0 && iv==fVertexSkip) {
-                                        //    std::cout << "merging the high pt mixed bins\t" << fPTt->At(iptt) << "\t" << fPTa->At(ipta) <<  "\t" << fPTt->At(it) <<  "\t" << fPTa->At(ia) << std::endl;
-                                        //    hDEtaMixVtx[ic][iv][iptt][ipta]->Print();
-                                        //}
-
-                                    }
-                                }
-                            }
-
-                            hDEtaMix[ic][iptt][ipta]->Add(hDEtaMixVtx[ic][iv][iptt][ipta]);
-                            scaleMix = 1./( mt->GetMixedNorm1D(hDEtaMixVtx[ic][iv][iptt][ipta]) );
-                            hDEtaMixVtx[ic][iv][iptt][ipta]->Scale(scaleMix);
-                        }
-
-                        scaleMix = 1./( mt->GetMixedNorm1D(hDEtaMix[ic][iptt][ipta]) );
-                        fFilipCorr_eta[ic][iptt][ipta] = scaleMix * 2 * dEta * hDEtaMix[ic][iptt][ipta]->Integral();
-                        hDEtaMix[ic][iptt][ipta]->Scale( scaleMix );
-                    }
-                }
-            }
-
-
-
-
-            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
-            {
-                // finish and restart loop so one can choose higher pta bin for mixed event
-                for(int ipta=0; ipta<fNumPta; ipta++)
-                {
-                    if(fPTt->At(iptt) < fPTa->At(ipta))
-                        continue; // PTa upper border should be smaller than PTt lower
-                    for(int ic=0; ic<fNumCent; ic++)
-                    {
-                        cta = GetCTA(ic,iptt,ipta);
-                        if( fVertexCorr )
-                        // Correction in vertex bins
-                        {
-                            hDEtaReal[ic][iptt][ipta]=(TH1D*)hDEtaRawVtx[ic][fVertexSkip][iptt][ipta]->Clone( "hDEtaReal_"+cta );
-                            hDEtaReal[ic][iptt][ipta]->Reset();
-                            for(int iv=fVertexSkip; iv<(fNumVtx-fVertexSkip); iv++)
-                            {
-                                if(fType==kPbPb) {
-                                    if(iptt>ipta_mixed && ipta>ipta_mixed) hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt_mixed][ipta_mixed] );
-                                    else if(iptt>ipta_mixed && ipta<=ipta_mixed) hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt_mixed][ipta] );
-                                    else if(iptt<=ipta_mixed && ipta>ipta_mixed) hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt][ipta_mixed] );
-                                    else hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( hDEtaMixVtx[ic][iv][iptt][ipta] );
-                                }
-                                else if(fType==kPP)
-                                    hDEtaRealVtx[ic][iv][iptt][ipta]->Divide( htmp_mixed[iv] );
-                                else {std::cerr<<"MCorr::LoadDEtaHistos()::unknown type (kPP, kPbPb defined)\n";}
-
-                                hDEtaReal[ic][iptt][ipta]->Add( hDEtaRealVtx[ic][iv][iptt][ipta] );
-                            }
-                        } else {
-                        // Correction after vertex summation
-                            hDEtaReal[ic][iptt][ipta] = (TH1D*)hDEtaRaw[ic][iptt][ipta]->Clone( "hDEtaReal_"+cta );
-                            if(fType==kPbPb) {
-                                if(iptt>ipta_mixed && ipta>ipta_mixed) hDEtaReal[ic][iptt][ipta]->Divide( hDEtaMix[ic][iptt_mixed][ipta_mixed] );
-                                else if(iptt>ipta_mixed && ipta<=ipta_mixed) hDEtaReal[ic][iptt][ipta]->Divide( hDEtaMix[ic][iptt_mixed][ipta] );
-                                else if(iptt<=ipta_mixed && ipta>ipta_mixed) hDEtaReal[ic][iptt][ipta]->Divide( hDEtaMix[ic][iptt][ipta_mixed] );
-                                else hDEtaReal[ic][iptt][ipta]->Divide( hDEtaMix[ic][iptt][ipta] );
-                            }
-                        }
-                        hDEtaReal[ic][iptt][ipta]->Scale( 1./fNTrigg[ic][iptt], "width" );
-                        //if(fPTt->At(iptt)<6. && fPTa->At(ipta)<6.)
-                            //hDEtaReal[ic][iptt][ipta]->Multiply( hDEtaReal2DFar[ic][iptt][ipta] ); // wing correction
-                        //std::cout << "wing correction: " <<  hDEtaReal[ic][iptt][ipta]->GetNbinsX() << "\t" << hDEtaReal2DFar[ic][iptt][ipta]->GetNbinsX() << std::endl;
-                        hDEtaRealFlip[ic][iptt][ipta] = (TH1D*) mt->Flip( hDEtaReal[ic][iptt][ipta] );
-                    }
-                }
-            }
-            fLoadedDEta=true;
-        }
-        double GetCorrToFilip(int ic, int iptt, int ipta)
-        {
-            return fFilipCorr_eta[ic][iptt][ipta];
-        }
+		bool checkChi2NDF(TF1 * f, double limit)
+		{
+            return ((f->GetChisquare())/((double)f->GetNDF()) <= limit);
+		}
 
         void FitDEtaHistos( TString opt="EMRNS", double fitmax = 1.6 )
-        {
-            FitResultsEta = new THashList( 50000 );
+		{
+			fFitOpt = opt;
+			std::cout << "MCorr::FitDEtaHistos\n";
+			fFitRange = fitmax;
+            TVirtualFitter::SetDefaultFitter("Minuit");
+
+			FitResultsEta = new THashList( 50000 );
+			FitResultsEta->SetOwner(kTRUE);
+
             CreateFitContainers( FitResultsEta );
 
-            std::cout << "MCorr::FitDEtaHistos\n";
+			TFitResultPtr r1[kF][kC][kT][kA]; // 1D
+			TFitResultPtr r2[kF][kC][kT][kA]; // 2D
 
-            TFitResultPtr r1[kF][kC][kT][kA];
-            TFitResultPtr r2[kF][kC][kT][kA];
+			double fitmin = 0;
+            int fitcount = 0;
 
             for(int ic=0; ic<fNumCent; ic++)
             {
@@ -1345,21 +1453,58 @@ class MCorr
                             continue; // PTa upper border should be smaller than PTt lower
 
                         int ifit = 0;
-                        //hDEtaRealFlip[ic][iptt][ipta]->SetBinError(1,1e5);
-                        // Gauss + Constant
-                        mfit_eta_1d[ifit][ic][iptt][ipta]  = new MFit(kOneGenGaussConst,kDEta,hDEtaRealFlip[ic][iptt][ipta], 0, fitmax, true);
-                        r1[ifit][ic][iptt][ipta] = hDEtaRealFlip[ic][iptt][ipta]->Fit( mfit_eta_1d[ifit][ic][iptt][ipta]->ffit, opt);
-                        mfit_eta_2d[ifit][ic][iptt][ipta]  = new MFit(kOneGenGaussConst,kDEta,hDEtaReal2DFlip[ic][iptt][ipta], 0, fitmax, true);
-                        r2[ifit][ic][iptt][ipta] = hDEtaReal2DFlip[ic][iptt][ipta]->Fit( mfit_eta_2d[ifit][ic][iptt][ipta]->ffit, opt);
+
+                        cout << ic << "\t" << iptt << "\t" << ipta << endl;
+                        cout << hDEtaRealFlip[ic][iptt][ipta]->Integral() << endl;
+						// ---------------------- Gauss + Constant
+
+                        mfit_eta_1d[ifit][ic][iptt][ipta] = new MFit(fitcount++, kOneGenGaussConst,kDEta,hDEtaRealFlip[ic][iptt][ipta],0,fitmax,true);
+						r1[ifit][ic][iptt][ipta] = hDEtaRealFlip[ic][iptt][ipta]->Fit( mfit_eta_1d[ifit][ic][iptt][ipta]->ffit, opt);
+                        //hDEtaRealFlipErr[ifit][ic][iptt][ipta] = (TH1D*)hDEtaRealFlip[ic][iptt][ipta]->Clone(Form("%sF%d_err",hDEtaRealFlip[ic][iptt][ipta]->GetName(),ifit));
+                        (TVirtualFitter::GetFitter())->GetConfidenceIntervals(mfit_eta_1d[ifit][ic][iptt][ipta]->hDEtaErr);
+
+                        mfit_eta_2d[ifit][ic][iptt][ipta]  = new MFit(fitcount++, kOneGenGaussConst,kDEta,hDEtaRealFlip2D[ic][iptt][ipta], 0, fitmax, true);
+                        r2[ifit][ic][iptt][ipta] = hDEtaRealFlip2D[ic][iptt][ipta]->Fit( mfit_eta_2d[ifit][ic][iptt][ipta]->ffit, opt);
+                        //hDEtaRealFlipErr2D[ifit][ic][iptt][ipta] = (TH1D*)hDEtaRealFlip2D[ic][iptt][ipta]->Clone(Form("%sF%d_err",hDEtaRealFlip2D[ic][iptt][ipta]->GetName(),ifit));
+                        (TVirtualFitter::GetFitter())->GetConfidenceIntervals(mfit_eta_2d[ifit][ic][iptt][ipta]->hDEtaErr);
                         ++ifit;
 
-                        // Generalized Gauss + Constant
-                        mfit_eta_1d[ifit][ic][iptt][ipta] = new MFit(kOneGenGaussConst,kDEta,hDEtaRealFlip[ic][iptt][ipta], 0, fitmax, false);
-                        mfit_eta_1d[ifit][ic][iptt][ipta]->ffit->SetParameters( mfit_eta_1d[0][ic][iptt][ipta]->ffit->GetParameters() ); // init from previous fit instead
-                        r1[ifit][ic][iptt][ipta] = hDEtaRealFlip[ic][iptt][ipta]->Fit( mfit_eta_1d[ifit][ic][iptt][ipta]->ffit, opt );
-                        mfit_eta_2d[ifit][ic][iptt][ipta] = new MFit(kOneGenGaussConst,kDEta,hDEtaReal2DFlip[ic][iptt][ipta], 0, fitmax, false);
-                        mfit_eta_2d[ifit][ic][iptt][ipta]->ffit->SetParameters( mfit_eta_2d[0][ic][iptt][ipta]->ffit->GetParameters() ); // init from previous fit instead
-                        r2[ifit][ic][iptt][ipta] = hDEtaReal2DFlip[ic][iptt][ipta]->Fit( mfit_eta_2d[ifit][ic][iptt][ipta]->ffit, opt );
+
+						// ---------------------- Generalized Gauss + Constant
+
+                        mfit_eta_1d[ifit][ic][iptt][ipta] = new MFit(fitcount++, kOneGenGaussConst,kDEta,hDEtaRealFlip[ic][iptt][ipta], 0, fitmax, false);
+						if( checkChi2NDF(mfit_eta_1d[0][ic][iptt][ipta]->ffit, 3.) ) // init from Gaussian fit if converged
+							mfit_eta_1d[ifit][ic][iptt][ipta]->ffit->SetParameters( mfit_eta_1d[0][ic][iptt][ipta]->ffit->GetParameters() );
+						r1[ifit][ic][iptt][ipta] = hDEtaRealFlip[ic][iptt][ipta]->Fit( mfit_eta_1d[ifit][ic][iptt][ipta]->ffit, opt );
+                        //hDEtaRealFlipErr[ifit][ic][iptt][ipta] = (TH1D*)hDEtaRealFlip[ic][iptt][ipta]->Clone(Form("%sF%d_err",hDEtaRealFlip[ic][iptt][ipta]->GetName(),ifit));
+                        (TVirtualFitter::GetFitter())->GetConfidenceIntervals(mfit_eta_1d[ifit][ic][iptt][ipta]->hDEtaErr);
+
+                        mfit_eta_2d[ifit][ic][iptt][ipta] = new MFit(fitcount++, kOneGenGaussConst,kDEta,hDEtaRealFlip2D[ic][iptt][ipta], 0, fitmax, false);
+                        if( checkChi2NDF(mfit_eta_2d[0][ic][iptt][ipta]->ffit, 3.) ) // init from Gaussian fit if converged
+                            mfit_eta_2d[ifit][ic][iptt][ipta]->ffit->SetParameters( mfit_eta_2d[0][ic][iptt][ipta]->ffit->GetParameters() );
+                        r2[ifit][ic][iptt][ipta] = hDEtaRealFlip2D[ic][iptt][ipta]->Fit( mfit_eta_2d[ifit][ic][iptt][ipta]->ffit, opt );
+                        //hDEtaRealFlipErr2D[ifit][ic][iptt][ipta] = (TH1D*)hDEtaRealFlip2D[ic][iptt][ipta]->Clone(Form("%sF%d_err",hDEtaRealFlip2D[ic][iptt][ipta]->GetName(),ifit));
+                        (TVirtualFitter::GetFitter())->GetConfidenceIntervals(mfit_eta_2d[ifit][ic][iptt][ipta]->hDEtaErr);
+                        ++ifit;
+
+
+                        // ----------------------  Small range Gauss + constant
+
+                        fitmin = 2.*mfit_eta_1d[0][ic][iptt][ipta]->GetWidth();
+
+                        mfit_eta_1d[ifit][ic][iptt][ipta]  = new MFit(fitcount++, kOneSmallGaussConst,kDEta,hDEtaRealFlip[ic][iptt][ipta], fitmin, fitmax, true);
+                        //if( checkChi2NDF(mfit_eta_1d[0][ic][iptt][ipta]->ffit, 3.) ) // init from Gaussian fit if converged
+                        //    mfit_eta_1d[ifit][ic][iptt][ipta]->ffit->SetParameters( mfit_eta_1d[0][ic][iptt][ipta]->ffit->GetParameters() );
+                        r1[ifit][ic][iptt][ipta] = hDEtaRealFlip[ic][iptt][ipta]->Fit( mfit_eta_1d[ifit][ic][iptt][ipta]->ffit, opt);
+                        //hDEtaRealFlipErr[ifit][ic][iptt][ipta] = (TH1D*)hDEtaRealFlip[ic][iptt][ipta]->Clone(Form("%sF%d_err",hDEtaRealFlip[ic][iptt][ipta]->GetName(),ifit));
+                        (TVirtualFitter::GetFitter())->GetConfidenceIntervals(mfit_eta_1d[ifit][ic][iptt][ipta]->hDEtaErr);
+
+                        mfit_eta_2d[ifit][ic][iptt][ipta]  = new MFit(fitcount++, kOneSmallGaussConst,kDEta,hDEtaRealFlip2D[ic][iptt][ipta], fitmin, fitmax, true);
+                        //if( checkChi2NDF(mfit_eta_2d[0][ic][iptt][ipta]->ffit, 3.) ) // init from Gaussian fit if converged
+                        //    mfit_eta_2d[ifit][ic][iptt][ipta]->ffit->SetParameters( mfit_eta_2d[0][ic][iptt][ipta]->ffit->GetParameters() );
+                        r2[ifit][ic][iptt][ipta] = hDEtaRealFlip2D[ic][iptt][ipta]->Fit( mfit_eta_2d[ifit][ic][iptt][ipta]->ffit, opt);
+                        //hDEtaRealFlipErr2D[ifit][ic][iptt][ipta] = (TH1D*)hDEtaRealFlip2D[ic][iptt][ipta]->Clone(Form("%sF%d_err",hDEtaRealFlip2D[ic][iptt][ipta]->GetName(),ifit));
+                        (TVirtualFitter::GetFitter())->GetConfidenceIntervals(mfit_eta_2d[ifit][ic][iptt][ipta]->hDEtaErr);
                         ++ifit;
 
                         // Kaplan + Constant
@@ -1383,18 +1528,18 @@ class MCorr
                         //r2[ifit][ic][iptt][ipta] = hDEtaReal2DFlip[ic][iptt][ipta]->Fit( mfit_eta_2d[ifit][ic][iptt][ipta]->ffit, opt ); //EMRNSQ
                         //++ifit;
 
-                        for(int i=0; i<ifit; i++)
+                        for(int i=0; i<ifit; ++i)
                         {
-                            if(ic==0 && iptt==fMinPTtBin && ipta==0) fFitNames.push_back(mfit_eta_1d[ifit][ic][iptt][ipta]->GetName());
-
-                            hDEtaSig[i][ic][iptt][ipta]   = mt->subtractConstTH1( hDEtaRealFlip[ic][iptt][ipta],   mfit_eta_1d[i][ic][iptt][ipta]->ffit );
-                            hDEtaSig2D[i][ic][iptt][ipta] = mt->subtractConstTH1( hDEtaReal2DFlip[ic][iptt][ipta], mfit_eta_2d[i][ic][iptt][ipta]->ffit );
-                        }
+							if(ic==0 && iptt==fMinPTtBin && ipta==0) {fFitNames.push_back(mfit_eta_1d[i][ic][iptt][ipta]->GetName());}
+							hDEtaSig1D[i][ic][iptt][ipta] = mt->subtractConstTH1( hDEtaRealFlip[ic][iptt][ipta], mfit_eta_1d[i][ic][iptt][ipta]->ffit );
+                            hDEtaSig2D[i][ic][iptt][ipta] = mt->subtractConstTH1( hDEtaRealFlip2D[ic][iptt][ipta], mfit_eta_2d[i][ic][iptt][ipta]->ffit );
+						}
                     }
                 }
             }
-            FillAllFitHistos(1, FitResultsEta, mfit_eta_1d, r1);
-            FillAllFitHistos(2, FitResultsEta, mfit_eta_2d, r2);
+
+			FillAllFitHistos(1, FitResultsEta, mfit_eta_1d, r1);
+			FillAllFitHistos(2, FitResultsEta, mfit_eta_2d, r2);
 
             fFittedDEta=true;
 
@@ -1414,7 +1559,7 @@ class MCorr
             }
             TString name;
 
-            for(int id=1; id<3; id++) // 1D, 2D
+            for(int id=1; id<3; id++)
             {
                 for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
                 {
@@ -1422,25 +1567,27 @@ class MCorr
                     {
                         for(int ic=0; ic<fNumCent; ic++)
                         {
-                            name = GetFitResultKeyCent(id,ifit,ic,iptt);
+							name = GetNotUniqueFitResultKeyCent(id,ifit,ic,iptt);
 
                             results->Add( new TH1D(Form("hYield_%s",name.Data()), "", fNumPta, ptaBO) );
                             results->Add( new TH1D(Form("hYield_INT_%s",name.Data()),"", fNumPta, ptaBO) );
                             results->Add( new TH1D(Form("hWidth_%s",name.Data()),"", fNumPta, ptaBO) );
                             results->Add( new TH1D(Form("hBackg_%s",name.Data()),"", fNumPta, ptaBO) );
                             results->Add( new TH1D(Form("hChi2NDF_%s",name.Data()),"", fNumPta, ptaBO) );
+                            results->Add( new TH1D(Form("hExpo_%s",name.Data()),"", fNumPta, ptaBO) );
                         }
                         for(int ipta=0; ipta<fNumPta; ipta++)
                         {
                             if(fPTt->At(iptt) < fPTa->At(ipta))
                                 continue; // PTa upper border should be smaller than PTt lower
 
-                            name = GetFitResultKeyPta(id,ifit,iptt,ipta);
+							name = GetNotUniqueFitResultKeyPta(id,ifit,iptt,ipta);
                             results->Add( new TH1D(Form("hYield_%s",name.Data()), "", fNumCent, centBO) );
                             results->Add( new TH1D(Form("hYield_INT_%s",name.Data()),"", fNumCent, centBO) );
                             results->Add( new TH1D(Form("hWidth_%s",name.Data()),"", fNumCent, centBO) );
                             results->Add( new TH1D(Form("hBackg_%s",name.Data()),"", fNumCent, centBO) );
                             results->Add( new TH1D(Form("hChi2NDF_%s",name.Data()),"", fNumCent, centBO) );
+                            results->Add( new TH1D(Form("hExpo_%s",name.Data()),"", fNumCent, centBO) );
                         }
                     }
                 }
@@ -1449,6 +1596,8 @@ class MCorr
 
         void FillAllFitHistos(int id, THashList * results, MFit * feta[kF][kC][kT][kA], TFitResultPtr r[5][kC][kT][kA])
         {
+			std::cout << "MCorr::FillAllFitHistos()...\n";
+
             TString name = "";
             double val = 0;
             double valerr = 0;
@@ -1460,43 +1609,56 @@ class MCorr
                 {
                     for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
                     {
-                        name = GetFitResultKeyCent(id,ifit,ic,iptt);
+						name = GetNotUniqueFitResultKeyCent(id,ifit,ic,iptt);
                         TH1D * hyield = (TH1D*) results->FindObject( Form("hYield_%s",name.Data()) );
                         TH1D * hyield_int = (TH1D*) results->FindObject( Form("hYield_INT_%s",name.Data()) );
                         TH1D * hwidth = (TH1D*) results->FindObject( Form("hWidth_%s",name.Data()) );
                         TH1D * hbackg = (TH1D*) results->FindObject( Form("hBackg_%s",name.Data()) );
                         TH1D * hchi2ndf = (TH1D*) results->FindObject( Form("hChi2NDF_%s",name.Data()) );
-
+                        TH1D * hexpo = (TH1D*) results->FindObject( Form("hExpo_%s",name.Data()) );
                         for(int ipta=0; ipta<fNumPta; ipta++)
                         {
                             if(fPTt->At(iptt) < fPTa->At(ipta))
                                 continue; // PTa upper border should be smaller than PTt lower
 
-                            hyield->SetBinContent(ipta+1, feta[ifit][ic][iptt][ipta]->GetYield());
-                            hyield->SetBinError(ipta+1, feta[ifit][ic][iptt][ipta]->GetYieldError(r[ifit][ic][iptt][ipta]) );
+                            if(r[ifit][ic][iptt][ipta])
+                            {
+                                hyield->SetBinContent(ipta+1, feta[ifit][ic][iptt][ipta]->GetYield());
+                                hyield->SetBinError(ipta+1, feta[ifit][ic][iptt][ipta]->GetYieldError(r[ifit][ic][iptt][ipta]) );
 
-                            int int_binmin = hDEtaSig[ifit][ic][iptt][ipta]->FindBin(0.0);
-                            int int_binmax = hDEtaSig[ifit][ic][iptt][ipta]->FindBin(0.5);
-                            if(id==1) val = hDEtaSig[ifit][ic][iptt][ipta]->IntegralAndError(int_binmin, int_binmax, valerr, "width" );
-                            if(id==2) val = hDEtaSig2D[ifit][ic][iptt][ipta]->IntegralAndError(int_binmin, int_binmax, valerr, "width" );
-                            hyield_int->SetBinContent(ipta+1, val);
-                            hyield_int->SetBinError(ipta+1, valerr);
+                                int int_binmin = hDEtaSig1D[ifit][ic][iptt][ipta]->FindBin(0.0);
+                                int int_binmax = hDEtaSig1D[ifit][ic][iptt][ipta]->FindBin(fFitRange);
+                                if(id==1) val = hDEtaSig1D[ifit][ic][iptt][ipta]->IntegralAndError(int_binmin, int_binmax, valerr, "width" );
+                                if(id==2) val = hDEtaSig2D[ifit][ic][iptt][ipta]->IntegralAndError(int_binmin, int_binmax, valerr, "width" );
+                                hyield_int->SetBinContent(ipta+1, val);
+                                hyield_int->SetBinError(ipta+1, valerr);
+                                hyield_int->Scale(2.);
 
-                            hwidth->SetBinContent(ipta+1, feta[ifit][ic][iptt][ipta]->GetWidth() );
-                            hwidth->SetBinError(ipta+1, feta[ifit][ic][iptt][ipta]->GetWidthError(r[ifit][ic][iptt][ipta]) );
+                                hwidth->SetBinContent(ipta+1, feta[ifit][ic][iptt][ipta]->GetWidth() );
+                                hwidth->SetBinError(ipta+1, feta[ifit][ic][iptt][ipta]->GetWidthError(r[ifit][ic][iptt][ipta]) );
 
-                            hbackg->SetBinContent(ipta+1, feta[ifit][ic][iptt][ipta]->ffit->GetParameter(0) );
-                            hbackg->SetBinError(ipta+1, feta[ifit][ic][iptt][ipta]->ffit->GetParError(0) );
+                                hbackg->SetBinContent(ipta+1, feta[ifit][ic][iptt][ipta]->ffit->GetParameter(0) );
+                                hbackg->SetBinError(ipta+1, feta[ifit][ic][iptt][ipta]->ffit->GetParError(0) );
 
-                            val = feta[ifit][ic][iptt][ipta]->ffit->GetChisquare();
-                            val /= (double)feta[ifit][ic][iptt][ipta]->ffit->GetNDF();
-                            hchi2ndf->SetBinContent(ipta+1,  val);
-                            hchi2ndf->SetBinError(ipta+1, 0);
+                                val = feta[ifit][ic][iptt][ipta]->ffit->GetChisquare();
+                                val /= (double)feta[ifit][ic][iptt][ipta]->ffit->GetNDF();
+                                hchi2ndf->SetBinContent(ipta+1,  val);
+                                hchi2ndf->SetBinError(ipta+1, 0);
+
+                                if(ifit==1) {
+
+                                    val = feta[ifit][ic][iptt][ipta]->GetExpo();
+                                    valerr = feta[ifit][ic][iptt][ipta]->GetExpoError();
+                                    hexpo->SetBinContent(ipta+1, val);
+                                    hexpo->SetBinError(ipta+1, valerr);
+                                }
+                            }
                         }
                     }
                 }
             }
             // fill centrality dependent histos
+
             for(int ifit = 0;ifit<kF; ifit++)
             {
                 for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
@@ -1505,35 +1667,47 @@ class MCorr
                     {
                         if(fPTt->At(iptt) < fPTa->At(ipta))
                             continue; // PTa upper border should be smaller than PTt lower
-                        name = GetFitResultKeyPta(id,ifit,iptt,ipta);
+						name = GetNotUniqueFitResultKeyPta(id,ifit,iptt,ipta);
                         TH1D * hyield = (TH1D*) results->FindObject( Form("hYield_%s",name.Data()) );
                         TH1D * hyield_int = (TH1D*) results->FindObject( Form("hYield_INT_%s",name.Data()) );
                         TH1D * hwidth = (TH1D*) results->FindObject( Form("hWidth_%s",name.Data()) );
                         TH1D * hbackg = (TH1D*) results->FindObject( Form("hBackg_%s",name.Data()) );
                         TH1D * hchi2ndf = (TH1D*) results->FindObject( Form("hChi2NDF_%s",name.Data()) );
+                        TH1D * hexpo = (TH1D*) results->FindObject( Form("hExpo_%s",name.Data()) );
 
                         for(int ic=0; ic<fNumCent; ic++)
                         {
-                            hyield->SetBinContent(ic+1,  feta[ifit][ic][iptt][ipta]->GetYield() );
-                            hyield->SetBinError(ic+1, feta[ifit][ic][iptt][ipta]->GetYieldError(r[ifit][ic][iptt][ipta]));
+                            if(r[ifit][ic][iptt][ipta])
+                            {
+                                hyield->SetBinContent(ic+1,  feta[ifit][ic][iptt][ipta]->GetYield() );
+                                hyield->SetBinError(ic+1, feta[ifit][ic][iptt][ipta]->GetYieldError(r[ifit][ic][iptt][ipta]));
 
-                            int int_binmin = hDEtaSig[ifit][ic][iptt][ipta]->FindBin(0.0);
-                            int int_binmax = hDEtaSig[ifit][ic][iptt][ipta]->FindBin(0.5);
-                            if(id==1) val = hDEtaSig[ifit][ic][iptt][ipta]->IntegralAndError(int_binmin, int_binmax, valerr, "width" );
-                            if(id==2) val = hDEtaSig2D[ifit][ic][iptt][ipta]->IntegralAndError(int_binmin, int_binmax, valerr, "width" );
-                            hyield_int->SetBinContent(ic+1, val);
-                            hyield_int->SetBinError(ic+1, valerr);
+                                int int_binmin = hDEtaSig1D[ifit][ic][iptt][ipta]->FindBin(0.0);
+                                int int_binmax = hDEtaSig1D[ifit][ic][iptt][ipta]->FindBin(0.5);
+                                if(id==1) val = hDEtaSig1D[ifit][ic][iptt][ipta]->IntegralAndError(int_binmin, int_binmax, valerr, "width" );
+                                if(id==2) val = hDEtaSig2D[ifit][ic][iptt][ipta]->IntegralAndError(int_binmin, int_binmax, valerr, "width" );
+                                hyield_int->SetBinContent(ic+1, val);
+                                hyield_int->SetBinError(ic+1, valerr);
 
-                            hwidth->SetBinContent(ic+1, feta[ifit][ic][iptt][ipta]->GetWidth() );
-                            hwidth->SetBinError(ic+1, feta[ifit][ic][iptt][ipta]->GetWidthError(r[ifit][ic][iptt][ipta]));
+                                hwidth->SetBinContent(ic+1, feta[ifit][ic][iptt][ipta]->GetWidth() );
+                                hwidth->SetBinError(ic+1, feta[ifit][ic][iptt][ipta]->GetWidthError(r[ifit][ic][iptt][ipta]));
 
-                            hbackg->SetBinContent(ic+1, feta[ifit][ic][iptt][ipta]->ffit->GetParameter(0) );
-                            hbackg->SetBinError(ic+1, feta[ifit][ic][iptt][ipta]->ffit->GetParError(0) );
+                                hbackg->SetBinContent(ic+1, feta[ifit][ic][iptt][ipta]->ffit->GetParameter(0) );
+                                hbackg->SetBinError(ic+1, feta[ifit][ic][iptt][ipta]->ffit->GetParError(0) );
 
-                            val = feta[ifit][ic][iptt][ipta]->ffit->GetChisquare();
-                            val /= (double)feta[ifit][ic][iptt][ipta]->ffit->GetNDF();
-                            hchi2ndf->SetBinContent(ic+1,  val);
-                            hchi2ndf->SetBinError(ic+1, 0);
+                                val = feta[ifit][ic][iptt][ipta]->ffit->GetChisquare();
+                                val /= (double)feta[ifit][ic][iptt][ipta]->ffit->GetNDF();
+                                hchi2ndf->SetBinContent(ic+1,  val);
+                                hchi2ndf->SetBinError(ic+1, 0);
+
+                                if(ifit==1) {
+                                    val = feta[ifit][ic][iptt][ipta]->GetExpo();
+                                    valerr = feta[ifit][ic][iptt][ipta]->GetExpoError();
+                                    hexpo->SetBinContent(ic+1, val);
+                                    hexpo->SetBinError(ic+1, valerr);
+                                }
+                            }
+
                         }
                     }
                 }
@@ -1569,9 +1743,9 @@ class MCorr
 
         // Basic plotting will take place here
         // more elaborate plots from other macro
-        void DrawDEta(int id)
+        void DrawDEtaFlipAll(int id)
         {
-            if(!fLoadedDEta)
+			if(!fProjectedDEtaDPhi)
                 return;
 
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
@@ -1579,112 +1753,67 @@ class MCorr
                     for(int ipta=0; ipta<fNumPta; ipta++){
                         if(fPTt->At(iptt) < fPTa->At(ipta))
                             continue; // PTa upper border should be smaller than PTt lower
-
-                        if(id==1) hList   = { hDEtaRealFlip[ic][iptt][ipta] };
-                        if(id==2) hList   = { hDEtaReal2DFlip[ic][iptt][ipta] };
-                        legList = {  Form("%dD |#Delta#phi|<%.1f", id, fPhiCut) };
-                        MPlot * meta = new MPlot(iplot++, "|#Delta#eta|", "1/N_{trigg.}dN/d#Delta#eta", false);
-
-                        meta->addHList(hList, legList, "pe");
-                        meta->SetLimitsX(0, 1.6);
-
-                        meta->AddInfo( BuildInfo() );
-                        if(fType != kPP) meta->AddInfo( BuildCentTitle(ic) );
-                        meta->AddInfo( BuildPTtTitle(iptt) );
-                        meta->AddInfo( BuildPTaTitle(ipta) );
-                        meta->Draw();
-
-                        if(fFittedDEta)
-                        {
-                            meta->fPad->cd();
-                            for(int ifit=0; ifit<kF; ifit++)
-                            {
-                                if(id==1)
-                                {
-                                    mfit_eta_1d[ifit][ic][iptt][ipta]->Draw();
-                                    meta->AddThisEntry( mfit_eta_1d[ifit][ic][iptt][ipta]->ffit, mfit_eta_1d[ifit][ic][iptt][ipta]->GetName(), "l");
-                                    meta->AddThisEntry((TObject*)0, Chi2NDF(mfit_eta_1d[ifit][ic][iptt][ipta]->ffit),"");
-                                }
-                                if(id==2)
-                                {
-                                    mfit_eta_2d[ifit][ic][iptt][ipta]->Draw();
-                                    meta->AddThisEntry( mfit_eta_2d[ifit][ic][iptt][ipta]->ffit, mfit_eta_2d[ifit][ic][iptt][ipta]->GetName(), "l");
-                                    meta->AddThisEntry((TObject*)0, Chi2NDF(mfit_eta_2d[ifit][ic][iptt][ipta]->ffit),"");
-                                }
-                            }
-                        }
-                        meta->Save( Form("../figs/Corr/eta_%dD_%s", id, GetCTA(ic,iptt,ipta).Data()) );
+                        DrawDEtaFlip(id,ic,iptt,ipta);
                     }
                 }
             }
         }
 
-        void DrawRaw2D1D()
+        void DrawDEtaFlip(int id, int ic, int iptt, int ipta)
         {
-            TH1D * hDEtaTmp = nullptr;
-            TH1D * hDEtaMixTmp = nullptr;
-            TH1D * hDEtaMix2DTmp = nullptr;
-            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
-                for(int ic=0; ic<fNumCent; ic++){
-                    for(int ipta=0; ipta<fNumPta; ipta++){
-                        if(fPTt->At(iptt) < fPTa->At(ipta))
-                            continue; // PTa upper border should be smaller than PTt lower
+            if(id==1) hList   = { hDEtaRealFlip[ic][iptt][ipta] };
+            if(id==2) hList   = { hDEtaRealFlip2D[ic][iptt][ipta] };
+            legList = {  Form("%dD |#Delta#phi|<%.1f", id, fPhiCut) };
+            MPlot * meta = new MPlot(iplot++, "|#Delta#eta|", "1/N_{trigg.}dN/d|#Delta#eta|", false);
 
-                        //cout << ic << "\t" << iptt << "\t" << ipta << endl;
-                        /*TCanvas * c = new TCanvas("c","",500,400);
-                        hDEtaRaw2D[ic][iptt][ipta]->Scale(1., "width");
-                        hDEtaRaw[ic][iptt][ipta]->Scale(1., "width");
-                        hDEtaRaw2D[ic][iptt][ipta]->SetMarkerColor(kRed);
-                        hDEtaRaw2D[ic][iptt][ipta]->SetLineColor(kRed);
-                        hDEtaRaw2D[ic][iptt][ipta]->Draw();
-                        hDEtaRaw[ic][iptt][ipta]->Draw("same");
-                        std::cout << hDEtaRaw2D[ic][iptt][ipta] << std:: endl;
-                        c->SaveAs(Form("../figs/Corr/2D1D_Raw_%s_C0%dT0%dA0%d.png", fTypeName.Data(), ic,iptt,ipta));
-                        delete c;*/
+            meta->addHList(hList, legList, "pe");
+            meta->SetLimitsX(0, 1.6);
 
+            meta->AddInfo( BuildInfo() );
+            if(fType != kPP) meta->AddInfo( BuildCentTitle(ic) );
+            meta->AddInfo( BuildPTtTitle(iptt) );
+            meta->AddInfo( BuildPTaTitle(ipta) );
+            meta->Draw();
 
-                        MPlot * mdeta = new MPlot(++iplot, "#Delta#eta", "counts",true);
+            if(fFittedDEta)
+            {
+                meta->fPad->cd();
+                for(int ifit=0; ifit<3; ifit++)
+                {
+                    if(id==1)
+                    {
+                        mfit_eta_1d[ifit][ic][iptt][ipta]->Draw();
+						meta->AddThisEntry( mfit_eta_1d[ifit][ic][iptt][ipta]->ffit, mfit_eta_1d[ifit][ic][iptt][ipta]->GetName(), "l");
+						meta->AddThisEntry((TObject*)0, Chi2NDF(mfit_eta_1d[ifit][ic][iptt][ipta]->ffit),"");
 
-                        hList = {   hDEtaRaw[ic][iptt][ipta], hDEtaRaw2D[ic][iptt][ipta] };
-                        legList={  "1D", "2D" };
-                        mdeta->addHList(hList, legList);
-                        mdeta->AddInfo( BuildInfo() );
-                        mdeta->AddInfo( BuildCentTitle(ic) );
-                        mdeta->AddInfo( BuildPTtTitle(iptt) );
-                        mdeta->AddInfo( BuildPTaTitle(ipta)  );
-                        mdeta->Draw();
-                        mdeta->SetLimitsX(-1.6,1.6);
-                        //mdeta->SetRatioLimits(0, 2.);
-                        mdeta->Save(Form("../figs/Corr/2D1D_Raw_%s_C0%dT0%dA0%d", fTypeName.Data(), ic,iptt,ipta));
+                        //if(ifit!=2){
+                        //	hDEtaRealFlipErr[ifit][ic][iptt][ipta]->SetFillColorAlpha(mfit_eta_1d[ifit][ic][iptt][ipta]->ffit->GetLineColor(), 0.5);
+                        //    hDEtaRealFlipErr[ifit][ic][iptt][ipta]->Draw("e3 same");
+                        //}
+                    }
+                    if(id==2)
+                    {
+                        mfit_eta_2d[ifit][ic][iptt][ipta]->Draw();
+                        meta->AddThisEntry( mfit_eta_2d[ifit][ic][iptt][ipta]->ffit, mfit_eta_2d[ifit][ic][iptt][ipta]->GetName(), "l");
+                        meta->AddThisEntry((TObject*)0, Chi2NDF(mfit_eta_2d[ifit][ic][iptt][ipta]->ffit),"");
 
-                        MPlot * mdetam = new MPlot(++iplot, "#Delta#eta", "counts",true);
-                        hDEtaMixTmp = (TH1D*) hDEtaMix[ic][iptt][ipta]->Clone();
-                        hDEtaMixTmp->Scale( 1./mt->GetMixedNorm1D(hDEtaMixTmp) );
-                        hDEtaMix2DTmp = (TH1D*) hDEtaMix2D[ic][iptt][ipta]->Clone();
-                        hDEtaMix2DTmp->Scale( 1./mt->GetMixedNorm1D(hDEtaMix2DTmp) );
-                        hList = { hDEtaMixTmp, hDEtaMix2DTmp };
-                        mdetam->addHList(hList, legList);
-                        mdetam->AddInfo( BuildInfo() );
-                        mdetam->AddInfo( BuildCentTitle(ic) );
-                        mdetam->AddInfo( BuildPTtTitle(iptt) );
-                        mdetam->AddInfo( BuildPTaTitle(ipta)  );
-                        mdetam->Draw();
-                        mdetam->SetLimitsX(-1.6,1.6);
-                        mdetam->SetRatioLimits(0, 2.);
-                        mdetam->Save(Form("../figs/Corr/2D1D_Mix_%s_C0%dT0%dA0%d", fTypeName.Data(), ic,iptt,ipta));
-
-                        delete mdeta;
-                        delete mdetam;
-
-
+                        //meta->DrawThisTH1((TH1D*)hDEtaRealFlip2D[ic][iptt][ipta], "PE same", 24, 601);
+                        //if(ifit!=2) {
+                        //    hDEtaRealFlipErr2D[ifit][ic][iptt][ipta]->SetFillColorAlpha(mfit_eta_2d[ifit][ic][iptt][ipta]->ffit->GetLineColor(), 0.5);
+                        //if(ifit==0) hDEtaRealFlipErr2D[ifit][ic][iptt][ipta]->SetFillStyle(3004);
+                        //if(ifit==1) hDEtaRealFlipErr2D[ifit][ic][iptt][ipta]->SetFillStyle(3007);
+                        //hDEtaRealFlipErr2D[ifit][ic][iptt][ipta]->Draw("e3 same");
+                        //}
                     }
                 }
             }
+            meta->Save( Form("../figs/Corr/etaflip_%dD_%s", id, GetCTA(ic,iptt,ipta).Data()) );
         }
 
-        void DrawDPhi(bool save)
+
+        void DrawDEtaAll(int id)
         {
-            if(!fLoadedDPhi)
+            if(!fProjectedDEtaDPhi)
                 return;
 
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
@@ -1692,64 +1821,50 @@ class MCorr
                     for(int ipta=0; ipta<fNumPta; ipta++){
                         if(fPTt->At(iptt) < fPTa->At(ipta))
                             continue; // PTa upper border should be smaller than PTt lower
-                        for(int isub=0; isub<3; isub++){
-
-                               MPlot * mphi = new MPlot(iplot++, "#Delta#phi", "1/N_{trigg.}dN/d#Delta#phi", false);
-
-                               if( isub<2 ) {
-                                   hList   = { hDPhiReal2D[0][ic][iptt][ipta], hDPhiReal2D[1][ic][iptt][ipta] };
-                                   legList = { Form("|#Delta#eta|<%.1f",fEtaCut), Form("|#Delta#eta|#geq%.1f",fEtaCut) };
-                               }
-                               if( isub==2) {
-                                   hList   = { hDPhiReal2D[2][ic][iptt][ipta] };
-                                   legList = { "#eta-gap subtracted" };
-                               }
-                               mphi->addHList(hList, legList, "pe");
-                               mphi->SetLimitsX(-0.45, 1.45);
-
-                               mphi->AddInfo( BuildInfo() );
-                               if( fType != kPP ) mphi->AddInfo( BuildCentTitle(ic) );
-                               mphi->AddInfo( BuildPTtTitle(iptt) );
-                               mphi->AddInfo( BuildPTaTitle(ipta) );
-                               mphi->Draw();
-
-                               if(fFittedDPhi)
-                               {
-                                   mphi->fPad->cd();
-
-                                   mphi->AddThisEntry( mfit_phi_gc[ic][iptt][ipta][isub]->ffit, mfit_phi_gc[ic][iptt][ipta][isub]->GetName(), "l");
-                                   mphi->AddThisEntry( mfit_phi_ggc[ic][iptt][ipta][isub]->ffit, mfit_phi_ggc[ic][iptt][ipta][isub]->GetName(), "l");
-                                   mphi->AddThisEntry( mfit_phi_kc[ic][iptt][ipta][isub]->ffit, mfit_phi_kc[ic][iptt][ipta][isub]->GetName(), "l");
-                                   mphi->AddThisEntry( mfit_phi_cc[ic][iptt][ipta][isub]->ffit, mfit_phi_cc[ic][iptt][ipta][isub]->GetName(), "l");
-                                   mphi->AddThisEntry( mfit_phi_qgc[ic][iptt][ipta][isub]->ffit, mfit_phi_qgc[ic][iptt][ipta][isub]->GetName(), "l");
-                                   mfit_phi_gc[ic][iptt][ipta][isub]->Draw();
-                                   mfit_phi_ggc[ic][iptt][ipta][isub]->Draw();
-                                   mfit_phi_kc[ic][iptt][ipta][isub]->Draw();
-                                   mfit_phi_cc[ic][iptt][ipta][isub]->Draw();
-                                   mfit_phi_qgc[ic][iptt][ipta][isub]->Draw();
-                               }
-                               if(save) mphi->Save(Form("../figs/Corr/phi_%s_SUB%d_%s", fTypeName.Data(), isub, GetCTA(ic,iptt,ipta).Data()));
-                        }
+                        DrawDEta(id,ic,iptt,ipta);
                     }
                 }
             }
         }
 
-        void DrawFitQA()
+        void DrawDEta(int id, int ic, int iptt, int ipta)
         {
-            DrawFitWidth();
-            DrawFitYield();
-            DrawFitBackg();
-            DrawFitQuality();
-            //DrawDataFitRatios();
+            if(id==1) hList   = { hDEtaReal[ic][iptt][ipta] };
+            if(id==2) hList   = { hDEtaReal2D[ic][iptt][ipta] };
+            legList = {  Form("%dD |#Delta#phi|<%.1f", id, fPhiCut) };
+            MPlot * meta = new MPlot(iplot++, "#Delta#eta", "1/N_{trigg.}dN/d#Delta#eta", false);
+
+            meta->addHList(hList, legList, "pe");
+            meta->SetLimitsX(-1.6, 1.6);
+
+            meta->AddInfo( BuildInfo() );
+            if(fType != kPP) meta->AddInfo( BuildCentTitle(ic) );
+            meta->AddInfo( BuildPTtTitle(iptt) );
+            meta->AddInfo( BuildPTaTitle(ipta) );
+            meta->Draw();
+
+            meta->Save( Form("../figs/Corr/eta_%dD_%s", id, GetCTA(ic,iptt,ipta).Data()) );
         }
-        void DrawDataFitRatios()
+
+
+
+		void DrawFitQA(int id=1)
+        {
+            DrawFitWidth(id);
+            DrawFitYield(id);
+            DrawFitBackg(id);
+            DrawFitQuality(id);
+            DrawFitExpo(id);
+
+            //DrawDataFitRatios(id);
+        }
+		void DrawDataFitRatios()
         {
             if(!fFittedDEta)
                 return;
 
-            double fmin = mfit_eta_1d[0][0][fMinPTtBin][0]->fitmin;
-            double fmax = mfit_eta_1d[0][0][fMinPTtBin][0]->fitmax;
+			double fmin = mfit_eta_1d[0][0][fMinPTtBin][0]->fitmin;
+			double fmax = mfit_eta_1d[0][0][fMinPTtBin][0]->fitmax;
 
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++){
                 for(int ic=0; ic<fNumCent; ic++){
@@ -1759,10 +1874,10 @@ class MCorr
                         TH1D * htmp_ggc_ratio = (TH1D*) hDEtaRealFlip[ic][iptt][ipta]->Clone("htmp_ggc_ratio");
                         TH1D * htmp_gc_ratio = (TH1D*) hDEtaRealFlip[ic][iptt][ipta]->Clone("htmp_gc_ratio");
                         // since cloning doesn't work for this constructor, copying things manually...
-                        MFit * mfit_gc  = new MFit(0,0,htmp_gc_ratio,  fmin, fmax, true);
-                        MFit * mfit_ggc = new MFit(0,0,htmp_ggc_ratio, fmin, fmax, false);
-                        mfit_gc->ffit->SetParameters(mfit_eta_1d[0][ic][iptt][ipta]->ffit->GetParameters());
-                        mfit_ggc->ffit->SetParameters(mfit_eta_1d[1][ic][iptt][ipta]->ffit->GetParameters());
+                        MFit * mfit_gc  = new MFit(-1, 0,0,htmp_gc_ratio,  fmin, fmax, true);
+                        MFit * mfit_ggc = new MFit(-2, 0,0,htmp_ggc_ratio, fmin, fmax, false);
+						mfit_gc->ffit->SetParameters(mfit_eta_1d[0][ic][iptt][ipta]->ffit->GetParameters());
+						mfit_ggc->ffit->SetParameters(mfit_eta_1d[1][ic][iptt][ipta]->ffit->GetParameters());
 
                         htmp_gc_ratio->Divide((TF1*) mfit_gc->ffit);
                         htmp_ggc_ratio->Divide((TF1*) mfit_ggc->ffit);
@@ -1788,12 +1903,12 @@ class MCorr
 
 
         // draws yield
-        void DrawFitYield()
+		void DrawFitYield(int id=1)
         {
-            DrawFitYieldPta();
-            if(fType!=kPP) DrawFitYieldCent();
+			DrawFitYieldPta(id);
+			if(fType!=kPP) DrawFitYieldCent(id);
         }
-        void DrawFitYieldPta()
+		void DrawFitYieldPta(int id=1)
         {
             TString name = "";
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
@@ -1801,11 +1916,11 @@ class MCorr
                 for(int ic=0; ic<fNumCent; ic++)
                 {
                     hList.clear(); legList.clear();
-                    for(int ifit=0; ifit<kF; ifit++)
+                    for(int ifit=0; ifit<2; ifit++)
                     {
-                        name = GetFitResultKeyCent(1,ifit,ic,iptt);
+                        name = GetNotUniqueFitResultKeyCent(id,ifit,ic,iptt);
                         hList.push_back( (TH1D*) FitResultsEta->FindObject( Form("hYield_%s",name.Data()) ) );
-                        legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
+						legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
                     }
                     MPlot * myp_p = new MPlot(++iplot, "p_{T, assoc} [GeV]", "yield", false);
                     myp_p->addHList(hList, legList, "PE");
@@ -1814,11 +1929,35 @@ class MCorr
                     myp_p->AddInfo( BuildPTtTitle(iptt));
                     //myp_p->SetLimitsXY(0, 10, 0, 5);
                     myp_p->Draw();
-                    myp_p->Save(Form("../figs/Fit/Yield_pta_%s_T0%dC0%d",fTypeName.Data(), iptt, ic));
+					myp_p->Save(Form("../figs/Fit/Yield_pta_%s_%dD_T0%dC0%d",fTypeName.Data(), id, iptt, ic));
                 }
             }
         }
-        void DrawFitYieldCent()
+		void Draw_Fit_INT_YieldPta(int ifit=0)
+		{
+			TString name = "";
+			for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
+			{
+				for(int ic=0; ic<fNumCent; ic++)
+				{
+					//hList.clear(); legList.clear();
+
+						name = GetNotUniqueFitResultKeyCent(1,ifit,ic,iptt);
+						hList = {(TH1D*) FitResultsEta->FindObject( Form("hYield_%s",name.Data()) ),  (TH1D*) FitResultsEta->FindObject( Form("hYield_INT_%s",name.Data()) ) };
+						legList = { mfit_eta_1d[ifit][0][iptt][0]->GetName(), "bin counting" };
+
+					MPlot * myp_p = new MPlot(++iplot, "p_{T, assoc} [GeV]", "yield", false);
+					myp_p->addHList(hList, legList, "PE");
+					myp_p->AddInfo( BuildInfo() );
+					if(fType==kPbPb) myp_p->AddInfo( BuildCentTitle(ic) );
+					myp_p->AddInfo( BuildPTtTitle(iptt));
+					//myp_p->SetLimitsXY(0, 10, 0, 5);
+					myp_p->Draw();
+					myp_p->Save(Form("../figs/Fit/Yield_pta_%s_T0%dC0%d",fTypeName.Data(), iptt, ic));
+				}
+			}
+		}
+		void DrawFitYieldCent(int id=1)
         {
             TString name = "";
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
@@ -1829,11 +1968,11 @@ class MCorr
                         continue;
 
                     hList.clear(); legList.clear();
-                    for(int ifit=0; ifit<kF; ifit++) {
-                        name = GetFitResultKeyPta(1,ifit,iptt,ipta);
+                    for(int ifit=0; ifit<2; ifit++) {
+						name = GetNotUniqueFitResultKeyPta(id,ifit,iptt,ipta);
                         TH1D * h = (TH1D*) FitResultsEta->FindObject( Form("hYield_%s",name.Data()) );
                         hList.push_back( h );
-                        legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
+						legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
                     }
                     MPlot * myp_c = new MPlot(++iplot, "centrality [%]", "yield", false);
                     myp_c->addHList(hList, legList, "PE");
@@ -1842,18 +1981,18 @@ class MCorr
                     myp_c->AddInfo( BuildPTtTitle(iptt));
                     myp_c->AddInfo( BuildPTaTitle(ipta));
                     myp_c->Draw();
-                    myp_c->Save(Form("../figs/Fit/Yield_cent_%s_T0%dA0%d",fTypeName.Data(), iptt, ipta));
+					myp_c->Save(Form("../figs/Fit/Yield_cent_%s_%dD_T0%dA0%d",fTypeName.Data(), id, iptt, ipta));
                 }
             }
         }
-        // draws width
-        void DrawFitWidth()
-        {
-            DrawFitWidthCent();
-            DrawFitWidthPta();
-        }
 
-        void DrawFitWidthPta()
+        // draws exponent of the gen.gaussian
+        void DrawFitExpo(int id=1)
+        {
+            if(fType!=kPP) DrawFitExpoCent(id);
+            DrawFitExpoPta(id);
+        }
+        void DrawFitExpoPta(int id=1)
         {
             TString name = "";
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
@@ -1861,9 +2000,68 @@ class MCorr
                 for(int ic=0; ic<fNumCent; ic++)
                 {
                     hList.clear(); legList.clear();
-                    for(int ifit=0; ifit<kF; ifit++)
+
+                    name = GetNotUniqueFitResultKeyCent(id,1,ic,iptt);
+                    hList.push_back( (TH1D*) FitResultsEta->FindObject( Form("hExpo_%s",name.Data()) ) );
+                    legList.push_back( mfit_eta_1d[1][0][iptt][0]->GetName() );
+
+                    MPlot * mep_p = new MPlot(++iplot, "p_{T, assoc} [GeV]", "exponent (fit)", false);
+                    mep_p->addHList(hList, legList, "PE");
+                    mep_p->SetLimitsXY(0, 10, 0, 3);
+                    mep_p->AddInfo( BuildInfo() );
+                    if(fType==kPbPb) mep_p->AddInfo( BuildCentTitle(ic) );
+                    mep_p->AddInfo( BuildPTtTitle(iptt));
+                    mep_p->Draw();
+                    mep_p->Save(Form("../figs/Fit/Expo_pta_%s_%dD_T0%dC0%d",fTypeName.Data(), id, iptt, ic));
+                }
+            }
+        }
+        void DrawFitExpoCent(int id=1)
+        {
+            TString name = "";
+            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
+            {
+                for(int ipta=0; ipta<fNumPta; ipta++)
+                {
+                    if(fPTt->At(iptt)<fPTa->At(ipta))
+                        continue;
+
+                    hList.clear(); legList.clear();
+                    name = GetNotUniqueFitResultKeyPta(id,1,iptt,ipta);
+                    TH1D * h = (TH1D*) FitResultsEta->FindObject( Form("hExpo_%s",name.Data()) );
+                    hList.push_back( h );
+                    legList.push_back( mfit_eta_1d[1][0][iptt][0]->GetName() );
+
+                    MPlot * mwp_c = new MPlot(++iplot, "centrality [%]", "exponent (fit)", false);
+                    mwp_c->addHList(hList, legList, "PE");
+                    mwp_c->SetLimitsXY(0, 90, 0, 3);
+                    mwp_c->AddInfo( BuildInfo() );
+                    mwp_c->AddInfo( BuildPTtTitle(iptt));
+                    mwp_c->AddInfo( BuildPTaTitle(ipta));
+                    mwp_c->Draw();
+                    mwp_c->Save(Form("../figs/Fit/Expo_cent_%s_%dD_T0%dA0%d",fTypeName.Data(), id, iptt, ipta));
+                }
+            }
+        }
+        // draws width
+		void DrawFitWidth(int id=1)
+        {
+            if(fType!=kPP) DrawFitWidthCent(id);
+			DrawFitWidthPta(id);
+        }
+
+		void DrawFitWidthPta(int id=1)
+        {
+            TString name = "";
+            TString legend = "";
+            for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
+            {
+                for(int ic=0; ic<fNumCent; ic++)
+                {
+                    hList.clear(); legList.clear();
+                    for(int ifit=0; ifit<2; ifit++)
                     {
-                        name = GetFitResultKeyCent(1,ifit,ic,iptt);
+						name = GetNotUniqueFitResultKeyCent(id,ifit,ic,iptt);
                         hList.push_back( (TH1D*) FitResultsEta->FindObject( Form("hWidth_%s",name.Data()) ) );
                         legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
                     }
@@ -1874,11 +2072,11 @@ class MCorr
                     if(fType==kPbPb) mwp_p->AddInfo( BuildCentTitle(ic) );
                     mwp_p->AddInfo( BuildPTtTitle(iptt));
                     mwp_p->Draw();
-                    mwp_p->Save(Form("../figs/Fit/Width_pta_%s_T0%dC0%d",fTypeName.Data(), iptt, ic));
+					mwp_p->Save(Form("../figs/Fit/Width_pta_%s_%dD_T0%dC0%d",fTypeName.Data(), id, iptt, ic));
                 }
             }
         }
-        void DrawFitWidthCent()
+		void DrawFitWidthCent(int id=1)
         {
             TString name = "";
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
@@ -1889,11 +2087,11 @@ class MCorr
                         continue;
 
                     hList.clear(); legList.clear();
-                    for(int ifit=0; ifit<kF; ifit++) {
-                        name = GetFitResultKeyPta(1,ifit,iptt,ipta);
+                    for(int ifit=0; ifit<2; ifit++) {
+						name = GetNotUniqueFitResultKeyPta(id,ifit,iptt,ipta);
                         TH1D * h = (TH1D*) FitResultsEta->FindObject( Form("hWidth_%s",name.Data()) );
                         hList.push_back( h );
-                        legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
+						legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
                     }
                     MPlot * mwp_c = new MPlot(++iplot, "centrality [%]", "#sigma (fit)", false);
                     mwp_c->addHList(hList, legList, "PE");
@@ -1902,18 +2100,18 @@ class MCorr
                     mwp_c->AddInfo( BuildPTtTitle(iptt));
                     mwp_c->AddInfo( BuildPTaTitle(ipta));
                     mwp_c->Draw();
-                    mwp_c->Save(Form("../figs/Fit/Width_cent_%s_T0%dA0%d",fTypeName.Data(), iptt, ipta));
+					mwp_c->Save(Form("../figs/Fit/Width_cent_%s_%dD_T0%dA0%d",fTypeName.Data(), id, iptt, ipta));
                 }
             }
         }
 
         // drawing constant background of the fit
-        void DrawFitBackg()
+		void DrawFitBackg(int id=1)
         {
-            DrawFitBackgPta();
-            DrawFitBackgCent();
+			DrawFitBackgPta(id);
+            if(fType!=kPP) DrawFitBackgCent(id);
         }
-        void DrawFitBackgPta()
+		void DrawFitBackgPta(int id=1)
         {
             TString name = "";
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
@@ -1921,11 +2119,11 @@ class MCorr
                 for(int ic=0; ic<fNumCent; ic++)
                 {
                     hList.clear(); legList.clear();
-                    for(int ifit=0; ifit<kF; ifit++)
+                    for(int ifit=0; ifit<2; ifit++)
                     {
-                        name = GetFitResultKeyCent(1,ifit,ic,iptt);
+						name = GetNotUniqueFitResultKeyCent(id,ifit,ic,iptt);
                         hList.push_back( (TH1D*) FitResultsEta->FindObject( Form("hBackg_%s",name.Data()) ) );
-                        legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
+						legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
                     }
                     MPlot * mbp_p = new MPlot(++iplot, "p_{T, assoc} [GeV]", "background (fit)", false);
                     mbp_p->addHList(hList, legList, "PE");
@@ -1934,11 +2132,11 @@ class MCorr
                     if(fType==kPbPb) mbp_p->AddInfo( BuildCentTitle(ic) );
                     mbp_p->AddInfo( BuildPTtTitle(iptt));
                     mbp_p->Draw();
-                    mbp_p->Save(Form("../figs/Fit/Backg_pta_%s_T0%dC0%d",fTypeName.Data(), iptt, ic));
+					mbp_p->Save(Form("../figs/Fit/Backg_pta_%s_%dD_T0%dC0%d",fTypeName.Data(), id, iptt, ic));
                 }
             }
         }
-        void DrawFitBackgCent()
+		void DrawFitBackgCent(int id=1)
         {
             TString name = "";
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
@@ -1949,11 +2147,11 @@ class MCorr
                         continue;
 
                     hList.clear(); legList.clear();
-                    for(int ifit=0; ifit<kF; ifit++) {
-                        name = GetFitResultKeyPta(1,ifit,iptt,ipta);
-                        TH1D * h = (TH1D*) FitResultsEta->FindObject( Form("hBackg_%s",name.Data()) );
+                    for(int ifit=0; ifit<2; ifit++) {
+						name = GetNotUniqueFitResultKeyPta(id,ifit,iptt,ipta);
+						TH1D * h = (TH1D*) FitResultsEta->FindObject( Form("hBackg_%s",name.Data()) );
                         hList.push_back( h );
-                        legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
+						legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
                     }
                     MPlot * mbp_c = new MPlot(++iplot, "centrality [%]", "background (fit)", false);
                     mbp_c->addHList(hList, legList, "PE");
@@ -1962,7 +2160,7 @@ class MCorr
                     mbp_c->AddInfo( BuildPTtTitle(iptt));
                     mbp_c->AddInfo( BuildPTaTitle(ipta));
                     mbp_c->Draw();
-                    mbp_c->Save(Form("../figs/Fit/Backg_cent_%s_T0%dA0%d",fTypeName.Data(), iptt, ipta));
+					mbp_c->Save(Form("../figs/Fit/Backg_cent_%s_%dD_T0%dA0%d",fTypeName.Data(),id, iptt, ipta));
                 }
             }
         }
@@ -1972,9 +2170,15 @@ class MCorr
             TString name = GetFitResultKeyPta(id,ifit,iptt,ipta);
             return (TH1D*) FitResultsEta->FindObject( Form("%s_%s",what.Data(), name.Data()) );
         }
+		TH1D * GetNotUniqueFitResultCent(TString what, int id,int ifit,int iptt,int ipta)
+		{
+			// what == hBackg, hYield, hWidth
+			TString name = GetNotUniqueFitResultKeyPta(id,ifit,iptt,ipta);
+			return (TH1D*) FitResultsEta->FindObject( Form("%s_%s",what.Data(), name.Data()) );
+		}
 
         // chi2/ndf plots
-        void DrawFitQuality()
+        void DrawFitQuality(int id=1)
         {
             TString name = "";
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
@@ -1982,20 +2186,20 @@ class MCorr
                 for(int ic=0; ic<fNumCent; ic++)
                 {
                     hList.clear(); legList.clear();
-                    for(int ifit=0; ifit<kF; ifit++)
+                    for(int ifit=0; ifit<2; ifit++)
                     {
-                        name = GetFitResultKeyCent(1,ifit,ic,iptt);
+                        name = GetNotUniqueFitResultKeyCent(id,ifit,ic,iptt);
                         hList.push_back( (TH1D*) FitResultsEta->FindObject( Form("hChi2NDF_%s",name.Data()) ) );
-                        legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
+						legList.push_back( mfit_eta_1d[ifit][0][iptt][0]->GetName() );
                     }
                     MPlot * mcp_p = new MPlot(++iplot, "p_{T, assoc} [GeV]", "#chi^{2}/NDF (fit)", false);
                     mcp_p->addHList(hList, legList, "PE");
-                    mcp_p->SetLimitsXY(0, 10, 0, 3);
+                    mcp_p->SetLimitsXY(0, 10, 0, 5);
                     mcp_p->AddInfo( BuildInfo() );
                     if(fType==kPbPb) mcp_p->AddInfo( BuildCentTitle(ic) );
                     mcp_p->AddInfo( BuildPTtTitle(iptt));
                     mcp_p->Draw();
-                    mcp_p->Save(Form("../figs/Fit/Chi2NDF_pta_%s_T0%dC0%d",fTypeName.Data(), iptt, ic));
+                    mcp_p->Save(Form("../figs/Fit/Chi2NDF_pta_%s_%dD_T0%dC0%d",fTypeName.Data(),id, iptt, ic));
                 }
             }
         }
@@ -2004,9 +2208,15 @@ class MCorr
         TString GetFitResultKeyPta(int id, int ifit, int iptt, int ipta) {
             return Form("eta_cent_%s_%dD_F%d_T%dA%d_count%d",fTypeName.Data(),id,ifit,iptt,ipta,fMCorrCount);
         }
+		TString GetNotUniqueFitResultKeyPta(int id, int ifit, int iptt, int ipta) {
+			return Form("eta_cent_%s_%dD_F%d_T%dA%d",fTypeName.Data(),id,ifit,iptt,ipta);
+		}
         TString GetFitResultKeyCent(int id, int ifit, int ic, int iptt) {
             return Form("eta_pta_%s_%dD_F%d_C%dT%d_count%d",fTypeName.Data(),id,ifit,ic,iptt,fMCorrCount);
         }
+		TString GetNotUniqueFitResultKeyCent(int id, int ifit, int ic, int iptt) {
+			return Form("eta_pta_%s_%dD_F%d_C%dT%d",fTypeName.Data(),id,ifit,ic,iptt);
+		}
         TString BuildCentTitle(int ic)
         {
             return Form("Cent: %.0f-%.0f %%",fCent->At(ic), fCent->At(ic+1));
@@ -2031,33 +2241,36 @@ class MCorr
             return Form("%.2f/%d=%.2f",chi2, ndf,chi2/double(ndf));
         }
 
+		TString GenerateOutputName()
+		{
+			return Form("%s_%s_R%d_v%.0f_p%.0f_fit%.0f_%s",fTypeName.Data(),fTrackCut.Data(), fResonance, TMath::Abs(fVertexCut),100*fPhiCut, fFitRange*10, fFitOpt.Data());
+		}
 
-        void SaveOutput(TString comment="")
+		void SaveOutput()
         {
-            TString outfilename = Form("../data/syst/%s_%s_v%.0f_p%.0f_%s.root",fTypeName.Data(),fTrackCut.Data(),TMath::Abs(fVertexCut),10*fPhiCut,comment.Data()); //fitrange (fit options),
-            std::cout << "MCorr::SaveOutput() to" << outfilename << std::endl;
+			TString outfilename = Form("../data/syst/%s.root",GenerateOutputName().Data());
+			std::cout << "MCorr::SaveOutput() to " << outfilename << std::endl;
 
-            TFile * foutfile = new TFile(outfilename,"CREATE","title");
-
+			TFile * foutfile = new TFile(outfilename,"RECREATE","title");
+			TString name = "";
             // correlation 1D-2D and wing correction
             for(int iptt=fMinPTtBin; iptt<fMaxPTtBin; iptt++)
             {
                 for(int ipta=0; ipta<fNumPta; ipta++)
                 {
                     if(fPTt->At(iptt)<fPTa->At(ipta))
-                    continue;
+                        continue;
                     for(int ic=0;ic<fNumCent; ic++)
                     {
-                        hDEtaReal2D[ic][iptt][ipta]->Write();
-                        hDEtaReal2DFlip[ic][iptt][ipta]->Write();
+						name = GetNotUniqueCTA(ic,iptt,ipta);
+						hDEtaRealFlip[ic][iptt][ipta]->Write(Form("hReal_1D_%s",name.Data()));
+                        hDEtaRealFlip2D[ic][iptt][ipta]->Write(Form("hReal_2D_%s",name.Data()));
+						hDEtaReal2DFar[ic][iptt][ipta]->Write(Form("hReal2DFar_%s",name.Data()));
 
-                        hDEtaReal2DFar[ic][iptt][ipta]->Write();
-
-                        hDEtaReal[ic][iptt][ipta]->Write();
-                        hDEtaRealFlip[ic][iptt][ipta]->Write();
-                        for(int ifit=0; ifit<kF; ifit++){
-                            hDEtaSig[ifit][ic][iptt][ipta]->Write();
-                            hDEtaSig2D[ifit][ic][iptt][ipta]->Write();
+						for(int ifit=0; ifit<kF; ifit++)
+						{
+							hDEtaSig1D[ifit][ic][iptt][ipta]->Write(Form("hSig_1D_F%d_%s",ifit, name.Data()));
+							hDEtaSig2D[ifit][ic][iptt][ipta]->Write(Form("hSig_2D_F%d_%s",ifit, name.Data()));
                         }
 
                     }
@@ -2065,10 +2278,23 @@ class MCorr
             }
 
             // fit results
-            //FitResultsEta->Write();
-            foutfile->Write();
+			FitResultsEta->Write();
+
+			foutfile->Write();
             foutfile->Close();
+
         }
+		// check if given setup has been run before by checking output directory for generated name. if true, one can
+		// skip processing again. Arguments are needed as these are traditionally set after loading, during fitting.
+		bool OutPutExists(TString fitopt, double fitrange){
+			fFitOpt = fitopt;
+			fFitRange = fitrange;
+			TString outfilename = Form("../data/syst/%s.root",GenerateOutputName().Data());
+			const std::string& name = std::string(outfilename.Data());
+			struct stat buffer;
+			return (stat (name.c_str(), &buffer) == 0);
+		}
+
 };
 
 #endif /* MCORR_H */
